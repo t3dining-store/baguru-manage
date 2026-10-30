@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">   <!-- 管理の画面なので、検索に出さない -->
+<meta name="theme-color" content="#1f1916">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="バグるマネージ">
+<title>バグるマネージ</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="img/manage-icon-192.png">
+<link rel="apple-touch-icon" href="img/manage-icon-180.png">
+<!-- 字の形は公式アプリ・ホームページと同じ。読めないときは、スマホの字で出る -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="css/manage.css?v=f772657c">
+</head>
+<body>
+<header class="m-top">
+  <button id="homeBtn" class="m-home" hidden>🏠 ホーム</button>   <!-- バグる Owner から開いたときだけ（manage.js） -->
+  <h1><img src="img/manage-icon-192.png" alt=""><span>バグるマネージ</span></h1>
+  <button id="saveBtn" class="m-save" hidden disabled>保存</button>
+</header>
+<p id="bar" class="m-bar" hidden></p>
+<main id="view"><p class="m-hint">読み込んでいます…</p></main>
+
+<!-- 公式アプリの「もと」（data.js）と、直した分を重ねるしくみ（content.js）。公開するときは、公式アプリの公開先のものを読む（道具/公開する.py） -->
+<script src="https://t3dining.github.io/baguru-app/js/data.js?v=860a89c0"></script>
+<script src="https://t3dining.github.io/baguru-app/js/content.js?v=159917de"></script>
+<script src="js/manage.js?v=d24973f5"></script>
+</body>
+</html>

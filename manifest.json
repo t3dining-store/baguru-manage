@@ -1,0 +1,16 @@
+{
+  "name": "バグるマネージ",
+  "short_name": "バグるマネージ",
+  "description": "炭焼ハンバーグ バグるの公式アプリの中身（お知らせ・メニューの値段・売り切れ・特典）を直す",
+  "id": "./",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#faf6f0",
+  "theme_color": "#1f1916",
+  "lang": "ja",
+  "icons": [
+    { "src": "img/manage-icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "img/manage-icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

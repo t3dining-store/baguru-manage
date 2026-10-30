@@ -1,0 +1,95 @@
+/* =====================================================================
+ *  バグるマネージ（公式アプリの中身を直す画面）
+ *  ★見た目はこのファイルだけで完結させる（公式アプリの css/app.css は読まない）。色の値は css/app.css の :root と同じ
+ * ===================================================================== */
+:root {
+  --coal: #1f1916; --coal-3: #2c241f; --cream: #faf6f0; --paper: #fff; --brass: #b8914b; --brass-soft: #f2ebe1;
+  --ember: #c7361d; --ember-soft: #fbe9e4; --flame: #e7792f; --ink: #221c18; --sub: #675d55; --line: #e6dccf;
+  --green: #2a8553; --red: #c23a3a; --red-soft: #fbe8e6;
+  --jp: "Zen Kaku Gothic New", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", system-ui, sans-serif;
+  --en: "Oswald", "Zen Kaku Gothic New", "Hiragino Sans", sans-serif;
+  --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px);
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; }
+body { background: var(--cream); color: var(--ink); font: 15px/1.6 var(--jp); -webkit-font-smoothing: antialiased; padding-bottom: calc(40px + var(--safe-b)); }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+input, textarea { font: inherit; font-size: 16px; color: var(--ink); }
+a { color: var(--ember); font-weight: 700; }
+
+/* 上の帯：炭の黒（公式アプリと同じ）。保存のボタンは右に */
+.m-top {
+  position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 8px;
+  padding: calc(8px + var(--safe-t)) 12px 8px; background: linear-gradient(180deg, var(--coal-3), var(--coal)); color: #fff;
+  box-shadow: 0 2px 0 var(--ember), 0 4px 14px rgba(10, 8, 7, .3);
+}
+.m-top h1 { flex: 1; display: flex; align-items: center; gap: 8px; margin: 0; font-size: 16px; letter-spacing: .04em; min-width: 0; }
+.m-top h1 img { width: 30px; height: 30px; border-radius: 8px; }
+.m-top h1 span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.m-home { height: 32px; padding: 0 10px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .35); font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+.m-home[hidden], .m-save[hidden] { display: none; }
+.m-save { height: 36px; padding: 0 18px; border-radius: 999px; background: var(--ember); color: #fff; font-weight: 700; }
+.m-save:disabled { background: #4a403a; color: #a99d92; cursor: default; }
+
+.m-bar { margin: 0; padding: 8px 14px; font-size: 12.5px; color: var(--sub); background: var(--brass-soft); border-bottom: 1px solid var(--line); }
+.m-bar.is-dirty { background: var(--ember-soft); color: var(--ember); font-weight: 700; }
+.m-bar[hidden] { display: none; }
+
+main { max-width: 720px; margin: 0 auto; padding: 0 14px; }
+.m-hint { margin: 10px 2px; font-size: 13px; color: var(--sub); }
+.m-err { margin: 8px 0 0; color: var(--red); font-size: 13.5px; font-weight: 700; }
+.m-foot { margin: 22px 2px 0; font-size: 12.5px; color: var(--sub); }
+
+/* 合言葉 */
+.m-login { max-width: 360px; margin: 40px auto 0; padding: 22px 18px; background: var(--paper); border: 1px solid var(--line); border-radius: 16px; text-align: center; }
+.m-login h2 { margin: 0 0 4px; font-size: 18px; }
+.m-login p { margin: 0 0 14px; font-size: 13px; color: var(--sub); }
+.m-login input { width: 100%; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 12px; text-align: center; letter-spacing: .2em; }
+.m-btn { display: flex; align-items: center; justify-content: center; width: 100%; height: 46px; margin-top: 12px; border-radius: 999px; background: var(--ember); color: #fff; font-weight: 700; }
+.m-btn:disabled { opacity: .5; }
+.m-btn.m-sub { background: var(--paper); color: var(--coal); border: 1.5px solid var(--line); height: 42px; font-size: 14px; }
+
+/* タブ */
+.m-tabs { position: sticky; top: calc(52px + var(--safe-t)); z-index: 10; display: flex; gap: 6px; overflow-x: auto; margin: 0 -14px; padding: 10px 14px; background: rgba(250, 246, 240, .94); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); scrollbar-width: none; }
+.m-tabs::-webkit-scrollbar { display: none; }
+.m-tabs button { flex: none; height: 34px; padding: 0 14px; border-radius: 999px; background: var(--paper); border: 1px solid var(--line); font-size: 13px; font-weight: 700; }
+.m-tabs button.on { background: var(--coal); border-color: var(--coal); color: #fff; }
+
+/* まとまり（見出しは公式アプリと同じ、左の赤い線） */
+.m-sec { margin-top: 14px; padding: 12px 14px 14px; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; }
+.m-sec h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 15.5px; }
+.m-sec h2::before { content: ""; width: 4px; height: 16px; border-radius: 1px; background: var(--ember); }
+.m-sec textarea, .m-sec input[type="text"], .m-sec input[type="date"] { width: 100%; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; }
+.m-sec textarea { resize: vertical; }
+.m-field { display: block; margin-top: 10px; }
+.m-field > span { display: block; margin-bottom: 4px; font-size: 12.5px; font-weight: 700; color: var(--sub); }
+
+/* 1つずつの行：名前／値段／チェック */
+.m-row { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; align-items: center; padding: 10px 0; border-top: 1px dashed var(--line); }
+.m-row:first-of-type { border-top: 0; }
+.m-name { grid-column: 1 / -1; font-size: 14.5px; }
+.m-prices { display: flex; flex-wrap: wrap; gap: 6px; }
+.m-flags { display: flex; gap: 6px; justify-self: end; }
+.m-price { display: inline-flex; align-items: center; gap: 3px; flex-wrap: wrap; }
+.m-price em { font-style: normal; font-size: 12px; font-weight: 700; color: var(--sub); margin-right: 2px; }
+.m-price span { font-family: var(--en); font-weight: 600; color: var(--sub); }
+.m-sec .m-price input { width: 92px; padding: 7px 10px; border: 1.5px solid var(--line); border-radius: 9px; font-family: var(--en); font-weight: 600; text-align: right; }   /* .m-sec input[type="text"] の横いっぱいより先に効かせる */
+.m-price small { flex-basis: 100%; font-size: 11px; font-weight: 700; color: var(--ember); }
+.m-flag { position: relative; display: inline-flex; }
+.m-flag input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.m-flag span { display: inline-flex; align-items: center; height: 34px; padding: 0 12px; border-radius: 999px; border: 1.5px solid var(--line); font-size: 12.5px; font-weight: 700; color: var(--sub); white-space: nowrap; }
+.m-flag.on span { background: var(--coal); border-color: var(--coal); color: #fff; }
+.m-flag input:focus-visible + span { outline: 3px solid var(--flame); outline-offset: 1px; }
+.m-row.is-out .m-name::after { content: "売り切れ"; margin-left: 8px; padding: 1px 8px; border-radius: 999px; background: var(--coal); color: #fff; font-size: 11px; vertical-align: 2px; }
+.m-row.is-hidden .m-name { color: var(--sub); text-decoration: line-through; }
+
+/* お知らせ */
+.m-news { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); }
+.m-news-top { display: flex; gap: 8px; align-items: center; }
+.m-news-top input { width: auto !important; flex: 1; }
+.m-move { display: flex; gap: 4px; }
+.m-move button { height: 36px; min-width: 36px; padding: 0 8px; border-radius: 9px; border: 1.5px solid var(--line); background: #fff; font-weight: 700; }
+.m-move button:disabled { opacity: .35; }
+.m-move .danger { color: var(--red); }
+
+.m-toast { position: fixed; left: 50%; bottom: calc(20px + var(--safe-b)); transform: translateX(-50%); z-index: 50; margin: 0; padding: 12px 18px; border-radius: 14px; background: var(--green); color: #fff; font-weight: 700; font-size: 14px; box-shadow: 0 6px 18px rgba(0, 0, 0, .2); width: max-content; max-width: calc(100% - 32px); text-align: center; }
