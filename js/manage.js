@@ -82,7 +82,7 @@ const sameList = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 /* ---- 描く ---- */
 const TABS = [
-  ['notice', '一言'], ['news', 'お知らせ'], ['items', 'テイクアウト'], ['choices', '選ぶもの'], ['dine', '店内'], ['rewards', '特典'],
+  ['notice', '一言'], ['news', 'お知らせ'], ['items', 'テイクアウト'], ['choices', '選ぶもの'], ['dine', '店内'], ['rewards', '特典'], ['texts', '文章'],
 ];
 
 function render() {
@@ -92,7 +92,7 @@ function render() {
   const y = window.scrollY;
   view.innerHTML = `
     <nav class="m-tabs">${TABS.map(([k, n]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${n}</button>`).join('')}</nav>
-    ${({ notice: noticeHtml, news: newsHtml, items: itemsHtml, choices: choicesHtml, dine: dineHtml, rewards: rewardsHtml })[tab]()}
+    ${({ notice: noticeHtml, news: newsHtml, items: itemsHtml, choices: choicesHtml, dine: dineHtml, rewards: rewardsHtml, texts: textsHtml })[tab]()}
     <p class="m-foot"><a href="${esc(appUrl())}" target="_blank" rel="noopener">公式アプリで見る ›</a><br>
       保存すると、公式アプリには数分のうちに出ます（開いている人は、開き直したときに）。値段はホームページには出ません（ホームページは別に直します）。</p>`;
   window.scrollTo(0, y);
@@ -221,6 +221,43 @@ function rewardsHtml() {
     }).join('');
 }
 
+/* ---- 文章：アプリの画面に出る文を全部直せる（一覧は js/texts.js。道具/文章を集める.py が作る） ---- */
+let textQuery = '', textOnly = false;
+const textOpen = new Set();
+const textRows = at => APP_TEXTS.filter(r => r.at === at);
+const textAts = [...new Set(APP_TEXTS.map(r => r.at))];
+
+function textRow(r) {
+  const to = draft.texts?.[r.t]?.to;
+  return `<div class="m-text ${to ? 'is-edited' : ''}">
+      <small>${esc(r.t)}</small>
+      <textarea data-f="text:to:${APP_TEXTS.indexOf(r)}" rows="${Math.min(5, Math.ceil(r.t.length / 20) || 1)}" aria-label="直した文">${esc(to ?? r.t)}</textarea>
+    </div>`;
+}
+
+function textListHtml() {
+  const q = textQuery.trim(), hits = (q || textOnly) && APP_TEXTS.filter(r => (!q || r.t.includes(q) || draft.texts?.[r.t]?.to.includes(q)) && (!textOnly || draft.texts?.[r.t]));
+  if (hits) {
+    return `<p class="m-hint">${hits.length}件${hits.length > 60 ? '（はじめの60件を出しています。言葉をしぼってください）' : ''}</p>${hits.slice(0, 60).map(textRow).join('')}`;
+  }
+  return textAts.map(at => {
+    const rows = textRows(at), n = rows.filter(r => draft.texts?.[r.t]).length;
+    return `<button class="m-group ${textOpen.has(at) ? 'on' : ''}" data-act="text-group" data-at="${esc(at)}"><b>${esc(at)}</b><small>${rows.length}件${n ? `・${n}件直しました` : ''}</small></button>
+      ${textOpen.has(at) ? rows.map(textRow).join('') : ''}`;
+  }).join('');
+}
+
+function textsHtml() {
+  return `<section class="m-sec">
+      <h2>アプリの文章</h2>
+      <p class="m-hint">公式アプリの画面に出る文を、全部ここで直せます。上の小さい字が元の文です。空にすると元の文に戻ります。下から見出しを開くか、言葉で探してください。</p>
+      <p class="m-hint">数字などが間に入る文は、前後に分かれて出ます。お知らせ・値段・売り切れ・特典は、それぞれのタブで直してください。</p>
+      <input id="textSearch" type="search" value="${esc(textQuery)}" placeholder="言葉で探す（例：受け取り）" aria-label="言葉で探す">
+      <label class="m-only"><input id="textOnly" type="checkbox" ${textOnly ? 'checked' : ''}>直したものだけ出す（${Object.keys(draft.texts || {}).length}件）</label>
+    </section>
+    <div id="textList">${textListHtml()}</div>`;
+}
+
 /* ---- 直す ---- */
 
 /** 入れた値を draft に写す。値段は、もとと同じなら消す。チェックは、外したら消す */
@@ -228,6 +265,13 @@ function take(el) {
   const [kind, field, ...rest] = el.dataset.f.split(':');
   const key = rest.join(':');
   const v = el.type === 'checkbox' ? el.checked : el.value;
+  if (kind === 'text') {
+    const r = APP_TEXTS[Number(key)], to = String(v).trim();
+    draft.texts ??= {};
+    if (!to || to === r.t) delete draft.texts[r.t]; else draft.texts[r.t] = { to, s: r.s };
+    if (!Object.keys(draft.texts).length) delete draft.texts;
+    return;
+  }
   if (kind === 'notice') {
     const n = { ...(draft.notice || {}), [field]: String(v).trim() };
     if (!n.text) delete draft.notice; else draft.notice = n.until ? n : { text: n.text };
@@ -270,14 +314,30 @@ function take(el) {
   }
 }
 
-document.addEventListener('input', e => { if (e.target.dataset.f && server) { take(e.target); drawBar(); } });
-document.addEventListener('change', e => { if (e.target.dataset.f && server) { take(e.target); render(); } });
+document.addEventListener('input', e => {
+  if (e.target.id === 'textSearch') { textQuery = e.target.value; $('#textList').innerHTML = textListHtml(); return; }   // 探す欄から指が離れないように、一覧だけ描き直す
+  if (e.target.dataset.f && server) { take(e.target); drawBar(); }
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'textOnly') { textOnly = e.target.checked; return render(); }
+  if (!e.target.dataset.f || !server) return;
+  take(e.target);
+  if (e.target.dataset.f.startsWith('text:')) {   // 文章のタブは、書いている場所が動かないように描き直さない
+    e.target.closest('.m-text').classList.toggle('is-edited', !!draft.texts?.[APP_TEXTS[Number(e.target.dataset.f.split(':')[2])].t]);
+    return drawBar();
+  }
+  render();
+});
 
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-tab]');
   if (t) { tab = t.dataset.tab; window.scrollTo(0, 0); return render(); }
   const b = e.target.closest('[data-act]');
   if (!b) return;
+  if (b.dataset.act === 'text-group') {
+    if (!textOpen.delete(b.dataset.at)) textOpen.add(b.dataset.at);
+    return render();
+  }
   const list = newsList(), i = Number(b.dataset.i);
   if (b.dataset.act === 'news-add') draft.news = [{ date: todayKey(), title: '', body: '' }, ...list];
   if (b.dataset.act === 'news-del') { if (!confirm(`「${list[i].title || '（見出しなし）'}」を消します。よろしいですか？`)) return; list.splice(i, 1); draft.news = list; }
