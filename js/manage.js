@@ -114,7 +114,7 @@ function loginHtml() {
   return `<form class="m-login" id="login">
       <h2>合言葉を入れてください</h2>
       <p>予約ボード・Order受付と同じ合言葉です。</p>
-      <input id="pin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="40" aria-label="合言葉">
+      <input id="pin" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" maxlength="40" aria-label="合言葉">
       ${loginErr ? `<p class="m-err">${esc(loginErr)}</p>` : ''}
       <button class="m-btn" ${busy ? 'disabled' : ''}>${busy ? '確かめています…' : '開く'}</button>
     </form>`;
