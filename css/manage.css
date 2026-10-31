@@ -31,7 +31,7 @@ a { color: var(--ember); font-weight: 700; }
 .m-save { height: 36px; padding: 0 18px; border-radius: 999px; background: var(--ember); color: #fff; font-weight: 700; }
 .m-save:disabled { background: #4a403a; color: #a99d92; cursor: default; }
 
-.m-bar { margin: 0; padding: 8px 14px; font-size: 12.5px; color: var(--sub); background: var(--brass-soft); border-bottom: 1px solid var(--line); }
+.m-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; padding: 6px 14px; font-size: 12.5px; color: var(--sub); background: var(--brass-soft); border-bottom: 1px solid var(--line); }
 .m-bar.is-dirty { background: var(--ember-soft); color: var(--ember); font-weight: 700; }
 .m-bar[hidden] { display: none; }
 
@@ -106,3 +106,19 @@ main { max-width: 720px; margin: 0 auto; padding: 0 14px; }
 .m-text small { display: block; margin-bottom: 4px; font-size: 11.5px; line-height: 1.45; color: var(--sub); }
 .m-text textarea { width: 100%; padding: 8px 10px; border: 1.5px solid var(--line); border-radius: 9px; background: #fff; resize: vertical; line-height: 1.45; }
 .m-text.is-edited { border-color: var(--ember); background: var(--ember-soft); }
+
+/* アプリで見る：保存する前の直しを入れた公式アプリを、画面の中に開く */
+.m-see { flex: none; height: 30px; padding: 0 11px; border-radius: 999px; background: var(--coal); color: #fff; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.m-text-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.m-text-top small { margin: 0; }
+body.is-seeing { overflow: hidden; }
+.m-see-box { position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column; background: var(--coal); padding-top: var(--safe-t); }
+.m-see-top { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; color: #fff; }
+.m-see-top button { height: 34px; padding: 0 16px; border-radius: 999px; background: #fff; color: var(--coal); font-weight: 700; font-size: 13px; }
+.m-see-tabs { display: flex; gap: 6px; overflow-x: auto; padding: 0 12px 8px; scrollbar-width: none; flex: none; }
+.m-see-tabs::-webkit-scrollbar { display: none; }
+.m-see-tabs button { flex: none; height: 30px; padding: 0 12px; border-radius: 999px; background: rgba(255, 255, 255, .14); color: #fff; font-size: 12.5px; font-weight: 700; }
+.m-see-tabs button.on { background: var(--ember); }
+.m-see-note { margin: 0; padding: 5px 12px; background: var(--brass-soft); font-size: 12px; color: var(--ink); flex: none; }
+.m-see-frame { flex: 1; min-height: 0; display: flex; justify-content: center; background: #4a403a; }
+.m-see-frame iframe { width: 100%; max-width: 430px; height: 100%; border: 0; background: #fff; }   /* パソコンでも、スマホと同じ幅で改行を見られるように */

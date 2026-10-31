@@ -106,9 +106,45 @@ function drawBar() {
   const bar = $('#bar');
   bar.hidden = false;
   bar.className = 'm-bar' + (d ? ' is-dirty' : '');
-  bar.textContent = d ? '保存していない直しがあります。上の「保存」を押すと、公式アプリに出ます。'
-    : `保存済み${server.at ? `（${whenText(server.at)}・版 ${server.v}）` : '（まだ何も直していません。公式アプリは data.js のまま）'}`;
+  bar.innerHTML = `<span>${esc(d ? '保存していない直しがあります。' : `保存済み${server.at ? `（${whenText(server.at)}・版 ${server.v}）` : '（まだ何も直していません）'}`)}</span>
+    <button class="m-see" data-act="see">アプリで見る</button>`;
 }
+
+/* ---- アプリで見る：保存する前の直しを入れた公式アプリを、画面の中に開く（改行などの見え方を確かめる）。★お客様には見えない ---- */
+const SEE_SCREENS = [['home', 'ホーム'], ['menu', 'メニュー'], ['cart', 'カート'], ['stamp', 'スタンプ'], ['shop', 'お店'], ['me', 'マイページ'], ['reserve', '予約']];
+const SEE_TAB = { notice: 'home', news: 'home', items: 'menu', choices: 'menu', dine: 'shop', rewards: 'stamp', texts: 'home' };
+const SEE_AT = {
+  'ホーム': 'home', 'テイクアウトのメニュー': 'menu', 'テイクアウトのメニュー（名前と説明）': 'menu', '商品を選ぶ画面': 'menu', 'アレルギー': 'menu', 'カート': 'cart', '受け取りとお名前': 'checkout',
+  '注文の様子': 'me', '配達・大量注文の申請': 'request', 'スタンプ': 'stamp', 'スタンプのQR': 'stamp', 'スタンプの決まり': 'stamp', 'お店の情報': 'shop', 'お店の情報（もとの設定）': 'shop',
+  '店内のメニュー（名前と説明）': 'shop', 'ネット予約': 'reserve', 'マイページ': 'me',
+};
+const seeUrl = route => (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)
+  ? `../index.html?${/[?&]test\b/.test(location.search) ? 'test&' : ''}preview#${route}`
+  : `${SHOP.appUrl}index.html?preview#${route}`);
+
+function openSee(route, focus = '') {
+  try {
+    sessionStorage.setItem('bg.preview', JSON.stringify(draft));
+    sessionStorage.setItem('bg.previewFocus', focus);
+  } catch (e) { return alert('この端末では、見え方を出せませんでした。'); }
+  let box = $('#see');
+  if (!box) {
+    box = Object.assign(document.createElement('div'), { id: 'see', className: 'm-see-box' });
+    document.body.append(box);
+  }
+  box.innerHTML = `<div class="m-see-top"><b>アプリでの見え方</b><button data-act="see-close">閉じる</button></div>
+    <nav class="m-see-tabs">${SEE_SCREENS.map(([k, n]) => `<button data-act="see-go" data-route="${k}" class="${k === route ? 'on' : ''}">${n}</button>`).join('')}</nav>
+    <p class="m-see-note" id="seeNote">${dirty() ? '保存前の直しが入っています。お客様にはまだ見えていません。' : 'お客様に見えている形です。'}</p>
+    <div class="m-see-frame"><iframe src="${esc(seeUrl(route))}" title="アプリでの見え方"></iframe></div>`;
+  document.body.classList.add('is-seeing');
+}
+const closeSee = () => { $('#see')?.remove(); document.body.classList.remove('is-seeing'); };
+// 確かめている文が、開いた画面に無かったとき（商品を選ぶ画面など、押して開く所にある文）
+window.addEventListener('message', e => {
+  if (e.origin !== location.origin || e.data?.type !== 'baguru-preview' || e.data.found) return;
+  const n = $('#seeNote');
+  if (n) n.textContent = 'この文は、今の画面には出ていません。下の画面を押して開くか、上で画面を切りかえて探してください。';
+});
 
 function loginHtml() {
   return `<form class="m-login" id="login">
@@ -230,7 +266,7 @@ const textAts = [...new Set(APP_TEXTS.map(r => r.at))];
 function textRow(r) {
   const to = draft.texts?.[r.t]?.to;
   return `<div class="m-text ${to ? 'is-edited' : ''}">
-      <small>${esc(r.t)}</small>
+      <div class="m-text-top"><small>${esc(r.t)}</small><button class="m-see" data-act="see-text" data-i="${APP_TEXTS.indexOf(r)}">アプリで見る</button></div>
       <textarea data-f="text:to:${APP_TEXTS.indexOf(r)}" rows="${Math.min(5, Math.ceil(r.t.length / 20) || 1)}" aria-label="直した文">${esc(to ?? r.t)}</textarea>
     </div>`;
 }
@@ -250,7 +286,7 @@ function textListHtml() {
 function textsHtml() {
   return `<section class="m-sec">
       <h2>アプリの文章</h2>
-      <p class="m-hint">公式アプリの画面に出る文を、全部ここで直せます。上の小さい字が元の文です。空にすると元の文に戻ります。下から見出しを開くか、言葉で探してください。</p>
+      <p class="m-hint">公式アプリの画面に出る文を、全部ここで直せます。上の小さい字が元の文です。改行すると、アプリでも改行されます。「アプリで見る」で、保存する前に見え方を確かめられます。空にすると元の文に戻ります。下から見出しを開くか、言葉で探してください。</p>
       <p class="m-hint">数字などが間に入る文は、前後に分かれて出ます。お知らせ・値段・売り切れ・特典は、それぞれのタブで直してください。</p>
       <input id="textSearch" type="search" value="${esc(textQuery)}" placeholder="言葉で探す（例：受け取り）" aria-label="言葉で探す">
       <label class="m-only"><input id="textOnly" type="checkbox" ${textOnly ? 'checked' : ''}>直したものだけ出す（${Object.keys(draft.texts || {}).length}件）</label>
@@ -334,6 +370,10 @@ document.addEventListener('click', e => {
   if (t) { tab = t.dataset.tab; window.scrollTo(0, 0); return render(); }
   const b = e.target.closest('[data-act]');
   if (!b) return;
+  if (b.dataset.act === 'see') return openSee(SEE_TAB[tab]);
+  if (b.dataset.act === 'see-go') return openSee(b.dataset.route);
+  if (b.dataset.act === 'see-close') return closeSee();
+  if (b.dataset.act === 'see-text') { const r = APP_TEXTS[Number(b.dataset.i)]; return openSee(SEE_AT[r.at] || 'home', draft.texts?.[r.t]?.to || r.t); }
   if (b.dataset.act === 'text-group') {
     if (!textOpen.delete(b.dataset.at)) textOpen.add(b.dataset.at);
     return render();
