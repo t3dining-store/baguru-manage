@@ -3,7 +3,8 @@
  *  ・公式アプリの「もと」は js/data.js。ここで直した分（もとと違うところだけ）を、受け口（予約ボードの受け口）に置く
  *    （appContent で読む・saveAppContent で保存。保存には台帳と同じ合言葉が要る）。公式アプリは起動したときに読んで重ねる（js/content.js）
  *  ・中身の形（content）は js/content.js の頭に書いてある。ここでは、もとと同じ値にしたものは消して、違うところだけを残す
- *  ・合言葉は、このタブの中だけに持つ（sessionStorage。閉じたら、また入れる）
+ *  ・合言葉は、1度入れたらこの端末に覚える（localStorage の baguru.daicho.pin。予約ボード・Order受付と同じ置き場所。2026-11-01 ko-dai さんの指示：「T3Works と同じように」）。
+ *    合言葉が変わったときは、また入れる画面が出る
  *  ・★この Mac で試すときは、にせの受け口（プレビュー「予約の受け口（試し）」）から ?test を付けて開く。本物の受け口に保存して試さない
  * ===================================================================== */
 
@@ -55,8 +56,10 @@ const MSG = {
 const message = e => MSG[e?.code] || MSG.no_answer;
 
 /* ---- 状態 ---- */
-let pin = '';
-try { pin = sessionStorage.getItem('bg.managePin') || ''; } catch (e) {}
+const PIN_KEY = 'baguru.daicho.pin';
+function pinGet() { try { return localStorage.getItem(PIN_KEY) || ''; } catch (e) { return ''; } }
+function pinSet(v) { try { if (v) localStorage.setItem(PIN_KEY, v); else localStorage.removeItem(PIN_KEY); } catch (e) {} }
+let pin = pinGet();
 let server = null;   // 受け口にある中身 { content, v, at }
 let draft = {};      // 直している中身（もとと違うところだけ）
 let tab = 'notice';
@@ -93,7 +96,7 @@ function render() {
   view.innerHTML = `
     <nav class="m-tabs">${TABS.map(([k, n]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${n}</button>`).join('')}</nav>
     ${({ notice: noticeHtml, news: newsHtml, items: itemsHtml, choices: choicesHtml, dine: dineHtml, rewards: rewardsHtml, texts: textsHtml })[tab]()}
-    <p class="m-foot"><a href="${esc(appUrl())}" target="_blank" rel="noopener">公式アプリで見る ›</a><br>
+    <p class="m-foot"><button class="m-link" data-act="forget">この端末の合言葉を消す</button><br><a href="${esc(appUrl())}" target="_blank" rel="noopener">公式アプリで見る ›</a><br>
       保存すると、公式アプリには数分のうちに出ます（開いている人は、開き直したときに）。値段はホームページには出ません（ホームページは別に直します）。</p>`;
   window.scrollTo(0, y);
   drawBar();
@@ -149,7 +152,7 @@ window.addEventListener('message', e => {
 function loginHtml() {
   return `<form class="m-login" id="login">
       <h2>合言葉を入れてください</h2>
-      <p>予約ボード・Order受付と同じ合言葉です。</p>
+      <p>予約ボード・Order受付と同じ合言葉です。1度入れると、この端末では次から入れなくて済みます。</p>
       <input id="pin" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" maxlength="40" aria-label="合言葉">
       ${loginErr ? `<p class="m-err">${esc(loginErr)}</p>` : ''}
       <button class="m-btn" ${busy ? 'disabled' : ''}>${busy ? '確かめています…' : '開く'}</button>
@@ -370,6 +373,11 @@ document.addEventListener('click', e => {
   if (t) { tab = t.dataset.tab; window.scrollTo(0, 0); return render(); }
   const b = e.target.closest('[data-act]');
   if (!b) return;
+  if (b.dataset.act === 'forget') {
+    if (!confirm('この端末の合言葉を消します。同じブラウザの予約ボード・Order受付でも、また入れることになります。よろしいですか？')) return;
+    pin = ''; pinSet(''); server = null; draft = {}; loginErr = '';
+    return render();
+  }
   if (b.dataset.act === 'see') return openSee(SEE_TAB[tab]);
   if (b.dataset.act === 'see-go') return openSee(b.dataset.route);
   if (b.dataset.act === 'see-close') return closeSee();
@@ -402,7 +410,7 @@ document.addEventListener('submit', async e => {
   try {
     await post({ action: 'ping', pin: v });
     pin = v;
-    try { sessionStorage.setItem('bg.managePin', v); } catch (err) {}
+    pinSet(v);
     await loadContent();
   } catch (err) {
     loginErr = message(err);
@@ -434,7 +442,7 @@ $('#saveBtn').onclick = async () => {
     } else if (err.code === 'bad_pin' || err.code === 'locked') {
       alert(message(err));
       server = null; pin = '';
-      try { sessionStorage.removeItem('bg.managePin'); } catch (e2) {}
+      if (err.code === 'bad_pin') pinSet('');
     } else alert(message(err));
   }
   busy = false;
@@ -454,7 +462,7 @@ window.addEventListener('beforeunload', e => { if (dirty()) { e.preventDefault()
 (async () => {
   if (pin) {
     try { await post({ action: 'ping', pin }); await loadContent(); }
-    catch (err) { if (err.code === 'bad_pin') { pin = ''; try { sessionStorage.removeItem('bg.managePin'); } catch (e) {} } loginErr = err.code === 'bad_pin' ? '' : message(err); }
+    catch (err) { if (err.code === 'bad_pin') { pin = ''; pinSet(''); } loginErr = err.code === 'bad_pin' ? '' : message(err); }
   }
   render();
 })();
