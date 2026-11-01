@@ -84,8 +84,10 @@ const lines = v => String(v).split('\n').map(x => x.trim()).filter(Boolean);
 const sameList = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 /* ---- 描く ---- */
+const MEMBER_PLUS = !!STAMP.memberPlus || (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) && /[?&]test\b/.test(location.search));   // 公式アプリの js/stamp-api.js と同じ
 const TABS = [
   ['notice', '一言'], ['news', 'お知らせ'], ['items', 'テイクアウト'], ['choices', '選ぶもの'], ['dine', '店内'], ['rewards', '特典'], ['texts', '文章'],
+  ...(MEMBER_PLUS ? [['people', '客層']] : []),
 ];
 
 function render() {
@@ -95,7 +97,7 @@ function render() {
   const y = window.scrollY;
   view.innerHTML = `
     <nav class="m-tabs">${TABS.map(([k, n]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${n}</button>`).join('')}</nav>
-    ${({ notice: noticeHtml, news: newsHtml, items: itemsHtml, choices: choicesHtml, dine: dineHtml, rewards: rewardsHtml, texts: textsHtml })[tab]()}
+    ${({ notice: noticeHtml, news: newsHtml, items: itemsHtml, choices: choicesHtml, dine: dineHtml, rewards: rewardsHtml, texts: textsHtml, people: peopleHtml })[tab]()}
     <p class="m-foot"><button class="m-link" data-act="forget">この端末の合言葉を消す</button><br><a href="${esc(appUrl())}" target="_blank" rel="noopener">公式アプリで見る ›</a><br>
       保存すると、公式アプリには数分のうちに出ます（開いている人は、開き直したときに）。値段はホームページには出ません（ホームページは別に直します）。</p>`;
   window.scrollTo(0, y);
@@ -111,6 +113,52 @@ function drawBar() {
   bar.className = 'm-bar' + (d ? ' is-dirty' : '');
   bar.innerHTML = `<span>${esc(d ? '保存していない直しがあります。' : `保存済み${server.at ? `（${whenText(server.at)}・版 ${server.v}）` : '（まだ何も直していません）'}`)}</span>
     <button class="m-see" data-act="see">アプリで見る</button>`;
+}
+
+/* ---- 客層：会員の性別と年代の集計（受け口の memberStats。スタンプ台帳の決めごと.md の13節）。★受け口は人数だけを返す。一人ずつの情報はここに来ない ---- */
+let people = null, peopleErr = '';
+async function loadPeople() {
+  people = null; peopleErr = '';
+  try {
+    people = await post({ action: 'memberStats', pin });
+  } catch (err) {
+    peopleErr = message(err);
+    if (err.code === 'bad_pin') { pin = ''; pinSet(''); server = null; }
+  }
+  if (tab === 'people' || !server) render();
+}
+const sum = list => list.reduce((a, b) => a + b, 0);
+const cell = (age, g) => people.table?.[age]?.[g] || 0;
+const peopleAges = () => [...people.ages, '未回答'], peopleGenders = () => [...people.genders, '未回答'];
+const barsHtml = rows => {
+  const top = Math.max(1, ...rows.map(r => r[1])), all = sum(rows.map(r => r[1]));
+  return `<ul class="m-bars">${rows.map(([k, n]) => `<li><span>${esc(k)}</span><i style="width:${Math.round(n / top * 100)}%"></i><b>${n}人<small>${all ? Math.round(n / all * 100) : 0}%</small></b></li>`).join('')}</ul>`;
+};
+function peopleHtml() {
+  if (peopleErr) return `<p class="m-err">${esc(peopleErr)}</p>`;
+  if (!people) return '<p class="m-hint">読み込んでいます…</p>';
+  const ages = peopleAges(), genders = peopleGenders();
+  return `<section class="m-sec">
+      <h2>客層</h2>
+      <p class="m-hint">会員登録をした ${people.registered}人 の集計です。「未回答」は、この項目ができる前に登録した人や、入れ直して戻したあとに入れ直していない人です。</p>
+      <button class="m-btn m-sub" data-act="people-csv">CSV で保存する</button>
+    </section>
+    <section class="m-sec"><h2>性別</h2>${barsHtml(genders.map(g => [g, sum(ages.map(a => cell(a, g)))]))}</section>
+    <section class="m-sec"><h2>年代</h2>${barsHtml(ages.map(a => [a, sum(genders.map(g => cell(a, g)))]))}</section>
+    <section class="m-sec"><h2>年代と性別</h2>
+      <div class="m-scroll"><table class="m-table">
+        <tr><th></th>${genders.map(g => `<th>${esc(g)}</th>`).join('')}<th>合計</th></tr>
+        ${ages.map(a => `<tr><th>${esc(a)}</th>${genders.map(g => `<td>${cell(a, g)}</td>`).join('')}<td><b>${sum(genders.map(g => cell(a, g)))}</b></td></tr>`).join('')}
+      </table></div>
+    </section>`;
+}
+function savePeople() {
+  const ages = peopleAges(), genders = peopleGenders();
+  const rows = [['年代', ...genders, '合計'], ...ages.map(a => [a, ...genders.map(g => cell(a, g)), sum(genders.map(g => cell(a, g)))])];
+  const url = URL.createObjectURL(new Blob(['\ufeff' + rows.map(r => r.join(',')).join('\r\n') + '\r\n'], { type: 'text/csv' }));   // 頭の印は、Excel で文字化けしないように
+  const a = Object.assign(document.createElement('a'), { href: url, download: `バグる客層_${todayKey()}.csv` });
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /* ---- アプリで見る：保存する前の直しを入れた公式アプリを、画面の中に開く（改行などの見え方を確かめる）。★お客様には見えない ---- */
@@ -370,7 +418,7 @@ document.addEventListener('change', e => {
 
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-tab]');
-  if (t) { tab = t.dataset.tab; window.scrollTo(0, 0); return render(); }
+  if (t) { tab = t.dataset.tab; window.scrollTo(0, 0); if (tab === 'people') loadPeople(); return render(); }
   const b = e.target.closest('[data-act]');
   if (!b) return;
   if (b.dataset.act === 'forget') {
@@ -378,6 +426,7 @@ document.addEventListener('click', e => {
     pin = ''; pinSet(''); server = null; draft = {}; loginErr = '';
     return render();
   }
+  if (b.dataset.act === 'people-csv') return savePeople();
   if (b.dataset.act === 'see') return openSee(SEE_TAB[tab]);
   if (b.dataset.act === 'see-go') return openSee(b.dataset.route);
   if (b.dataset.act === 'see-close') return closeSee();
