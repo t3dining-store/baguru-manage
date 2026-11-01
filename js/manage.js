@@ -162,7 +162,7 @@ function savePeople() {
 }
 
 /* ---- アプリで見る：保存する前の直しを入れた公式アプリを、画面の中に開く（改行などの見え方を確かめる）。★お客様には見えない ---- */
-const SEE_SCREENS = [['home', 'ホーム'], ['menu', 'メニュー'], ['cart', 'カート'], ['stamp', 'スタンプ'], ['shop', 'お店'], ['me', 'マイページ'], ['reserve', '予約']];
+const SEE_SCREENS = [['join', '登録'], ['home', 'ホーム'], ['menu', 'メニュー'], ['cart', 'カート'], ['stamp', 'スタンプ'], ['shop', 'お店'], ['me', 'マイページ'], ['reserve', '予約']];
 const SEE_TAB = { notice: 'home', news: 'home', items: 'menu', choices: 'menu', dine: 'shop', rewards: 'stamp', texts: 'home' };
 const SEE_AT = {
   'ホーム': 'home', 'テイクアウトのメニュー': 'menu', 'テイクアウトのメニュー（名前と説明）': 'menu', '商品を選ぶ画面': 'menu', 'アレルギー': 'menu', 'カート': 'cart', '受け取りとお名前': 'checkout',
