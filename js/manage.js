@@ -160,7 +160,7 @@ function loginHtml() {
 }
 
 const priceIn = (f, v, base, label = '') => `<label class="m-price">${label ? `<em>${esc(label)}</em>` : ''}<span>¥</span>
-    <input type="text" inputmode="numeric" data-f="${f}" value="${v ?? base}" aria-label="${esc(label || '値段')}">
+    <input type="text" inputmode="numeric" data-f="${f}" value="${esc(v ?? base)}" aria-label="${esc(label || '値段')}">
     ${v != null && v !== base ? `<small>もと ${yen(base)}</small>` : ''}</label>`;
 const flagIn = (f, on, label) => `<label class="m-flag ${on ? 'on' : ''}"><input type="checkbox" data-f="${f}" ${on ? 'checked' : ''}><span>${label}</span></label>`;
 
