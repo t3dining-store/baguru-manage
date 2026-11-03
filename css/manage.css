@@ -124,6 +124,32 @@ body.is-seeing { overflow: hidden; }
 .m-see-frame iframe { width: 100%; max-width: 430px; height: 100%; border: 0; background: #fff; }   /* パソコンでも、スマホと同じ幅で改行を見られるように */
 .m-link { color: var(--sub); font-size: 12.5px; font-weight: 700; text-decoration: underline; margin-bottom: 8px; }
 
+/* 文章の「画面で直す」（manage.js の editShow）。中のアプリはスマホの幅（390）のまま、枠に合わせて縮める */
+.m-switch { display: flex; gap: 6px; margin: 6px 0 2px; }
+.m-switch button { flex: 1; height: 38px; border-radius: 999px; border: 1.5px solid var(--line); background: #fff; font-size: 13.5px; font-weight: 700; color: var(--sub); }
+.m-switch button.on { background: var(--coal); border-color: var(--coal); color: #fff; }
+.m-ed { margin-top: 12px; }
+.m-ed[hidden] { display: none; }
+.m-ed-tabs { display: flex; gap: 6px; overflow-x: auto; margin: 0 -14px; padding: 0 14px 8px; scrollbar-width: none; }
+.m-ed-tabs::-webkit-scrollbar { display: none; }
+.m-ed-tabs button { flex: none; height: 32px; padding: 0 13px; border-radius: 999px; background: var(--paper); border: 1px solid var(--line); font-size: 12.5px; font-weight: 700; }
+.m-ed-tabs button.on { background: var(--ember); border-color: var(--ember); color: #fff; }
+.m-ed-mode { display: flex; margin-bottom: 8px; padding: 3px; border-radius: 999px; background: var(--brass-soft); border: 1px solid var(--line); }
+.m-ed-mode button { flex: 1; height: 34px; border-radius: 999px; font-size: 13px; font-weight: 700; color: var(--sub); }
+.m-ed-mode button.on { background: var(--paper); color: var(--ink); box-shadow: 0 1px 4px rgba(10, 8, 7, .15); }
+.m-ed-frame { position: relative; height: min(56vh, 680px); overflow: hidden; border-radius: 14px; background: #4a403a; border: 1px solid var(--line); }
+@supports (height: 1svh) { .m-ed-frame { height: min(56svh, 680px); } }
+.m-ed-frame iframe { position: absolute; top: 0; left: 0; border: 0; background: #fff; transform-origin: 0 0; }
+.m-ed-panel { margin-top: 10px; padding: 12px 14px; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; }
+.m-ed-panel .m-text { margin: 0; padding: 0; border: 0; background: none; }
+.m-ed-panel .m-text.is-edited textarea { border-color: var(--ember); background: var(--ember-soft); }
+.m-ed-panel .m-hint { margin: 8px 0 0; }
+.m-ed-q { margin: 0; font-size: 14px; font-weight: 700; }
+.m-ed-cand { display: block; width: 100%; margin-top: 8px; padding: 10px 12px; border-radius: 10px; border: 1.5px solid var(--line); background: #fff; text-align: left; }
+.m-ed-cand b { display: block; font-size: 14px; line-height: 1.45; }
+.m-ed-cand small { display: block; margin-top: 2px; font-size: 11.5px; color: var(--sub); }
+.m-ed-undo { flex: none; height: 30px; padding: 0 11px; border-radius: 999px; border: 1.5px solid var(--line); background: #fff; font-size: 12px; font-weight: 700; color: var(--ember); white-space: nowrap; }
+
 /* 客層 */
 .m-bars { list-style: none; margin: 4px 0 0; padding: 0; }
 .m-bars li { position: relative; display: grid; grid-template-columns: 76px 1fr auto; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 13.5px; }

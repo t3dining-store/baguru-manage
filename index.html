@@ -29,7 +29,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="css/manage.css?v=5e4a9077">
+<link rel="stylesheet" href="css/manage.css?v=af14f7d2">
 </head>
 <body>
 <header class="m-top">
@@ -38,12 +38,16 @@
   <button id="saveBtn" class="m-save" hidden disabled>保存</button>
 </header>
 <p id="bar" class="m-bar" hidden></p>
-<main id="view"><p class="m-hint">読み込んでいます…</p></main>
+<main>
+  <div id="view"><p class="m-hint">読み込んでいます…</p></div>
+  <section id="edit" class="m-ed" hidden></section>   <!-- 文章の「画面で直す」。描き直しで中のアプリが読み直されないよう、#view の外に置く（manage.js の editShow） -->
+  <div id="foot"></div>
+</main>
 
 <!-- 公式アプリの「もと」（data.js）と、直した分を重ねるしくみ（content.js）。公開するときは、公式アプリの公開先のものを読む（道具/公開する.py） -->
 <script src="https://t3dining.github.io/baguru-app/js/data.js?v=c54ffd1b"></script>
-<script src="https://t3dining.github.io/baguru-app/js/content.js?v=b4609d7d"></script>
+<script src="https://t3dining.github.io/baguru-app/js/content.js?v=7ca2de3d"></script>
 <script src="js/texts.js?v=34445933"></script>   <!-- 公式アプリの文章の一覧（道具/文章を集める.py が作る） -->
-<script src="js/manage.js?v=e3525bd0"></script>
+<script src="js/manage.js?v=181ead5e"></script>
 </body>
 </html>

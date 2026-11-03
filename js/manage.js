@@ -93,13 +93,15 @@ const TABS = [
 function render() {
   const view = $('#view');
   $('#saveBtn').hidden = !server;
-  if (!server) { view.innerHTML = loginHtml(); $('#bar').hidden = true; return $('#pin')?.focus(); }
+  if (!server) { view.innerHTML = loginHtml(); $('#foot').innerHTML = ''; editShow(); $('#bar').hidden = true; return $('#pin')?.focus(); }
   const y = window.scrollY;
   view.innerHTML = `
     <nav class="m-tabs">${TABS.map(([k, n]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${n}</button>`).join('')}</nav>
-    ${({ notice: noticeHtml, news: newsHtml, items: itemsHtml, choices: choicesHtml, dine: dineHtml, rewards: rewardsHtml, texts: textsHtml, people: peopleHtml })[tab]()}
-    <p class="m-foot"><button class="m-link" data-act="forget">この端末の合言葉を消す</button><br><a href="${esc(appUrl())}" target="_blank" rel="noopener">公式アプリで見る ›</a><br>
+    ${({ notice: noticeHtml, news: newsHtml, items: itemsHtml, choices: choicesHtml, dine: dineHtml, rewards: rewardsHtml, texts: textsHtml, people: peopleHtml })[tab]()}`;
+  // 下の字は #foot に（文章の「画面で直す」のときは、中のアプリの下に出る）
+  $('#foot').innerHTML = `<p class="m-foot"><button class="m-link" data-act="forget">この端末の合言葉を消す</button><br><a href="${esc(appUrl())}" target="_blank" rel="noopener">公式アプリで見る ›</a><br>
       保存すると、公式アプリには数分のうちに出ます（開いている人は、開き直したときに）。値段はホームページには出ません（ホームページは別に直します）。</p>`;
+  editShow();
   window.scrollTo(0, y);
   drawBar();
 }
@@ -335,8 +337,17 @@ function textListHtml() {
 }
 
 function textsHtml() {
+  const sw = `<div class="m-switch">${[['screen', '画面で直す'], ['list', '一覧で直す']].map(([k, n]) => `<button data-act="text-mode" data-mode="${k}" class="${textMode === k ? 'on' : ''}">${n}</button>`).join('')}</div>`;
+  if (textMode === 'screen') {
+    return `<section class="m-sec">
+      <h2>アプリの文章</h2>
+      ${sw}
+      <p class="m-hint">点線の文を押すと、アプリの下の欄で直せます。保存するまで、お客様には見えません。押して開く所（商品を選ぶ画面など）は「アプリを動かす」で開いてから、「文を押して直す」に戻して押します。</p>
+    </section>`;
+  }
   return `<section class="m-sec">
       <h2>アプリの文章</h2>
+      ${sw}
       <p class="m-hint">公式アプリの画面に出る文を、全部ここで直せます。上の小さい字が元の文です。改行すると、アプリでも改行されます。「アプリで見る」で、保存する前に見え方を確かめられます。空にすると元の文に戻ります。下から見出しを開くか、言葉で探してください。</p>
       <p class="m-hint">数字などが間に入る文は、前後に分かれて出ます。お知らせ・値段・売り切れ・特典は、それぞれのタブで直してください。</p>
       <input id="textSearch" type="search" value="${esc(textQuery)}" placeholder="言葉で探す（例：受け取り）" aria-label="言葉で探す">
@@ -344,6 +355,137 @@ function textsHtml() {
     </section>
     <div id="textList">${textListHtml()}</div>`;
 }
+
+/* ---- 文章の「画面で直す」（2026-11-03 ko-dai さんの指示：ホームページの管理画面のように、実際の画面を直しているような感じで文章を直す） ----
+ *  本物の公式アプリを中に開き（?preview&edit。公式アプリの js/content.js の TEXT_EDIT）、点線の文を押すと、下の欄で直せる。打ったそばから画面に出る。
+ *  保存は上の「保存」（ほかのタブと同じ）。お客様には、保存するまで見えない（「アプリで見る」と同じく、直しは sessionStorage の bg.preview で渡す）。
+ *  中のアプリは、描き直しのたびに読み直さないよう、#view の外（#edit）に1回だけ作る。やりとりは同じ場所のページとだけ（postMessage） */
+let textMode = 'screen';
+let ed = null;      // { frame, route, on（文を押して直す）, row（直している文の APP_TEXTS の番号。無ければ -1）, cands（押した所の文の番号。押す前は null）, base }
+const ED_W = 390;   // 中のアプリの幅（スマホと同じ幅にして、改行の位置をそろえる）
+const editUrl = route => seeUrl(route).replace('preview#', 'preview&edit#');
+const edPost = msg => ed?.frame?.contentWindow?.postMessage({ type: 'baguru-manage', ...msg }, location.origin);
+const notTexts = () => canon({ ...draft, texts: undefined });
+const oneLine = t => String(t).replace(/\s+/g, ' ').trim();
+const edKey = i => ({ key: i >= 0 ? APP_TEXTS[i].t : '', s: i >= 0 ? APP_TEXTS[i].s : 0 });
+
+function editStore() {
+  try { sessionStorage.setItem('bg.preview', JSON.stringify(draft)); sessionStorage.setItem('bg.previewFocus', ''); } catch (e) { /* 出せないだけ */ }
+}
+/** 文章のタブで「画面で直す」のときだけ出す。ほかのタブで直した分（値段など）があれば、入れて開き直す */
+function editShow() {
+  const box = $('#edit'), on = !!server && tab === 'texts' && textMode === 'screen';
+  box.hidden = !on;
+  if (!on) return;
+  if (!ed) editBuild(box);
+  else if (ed.base !== notTexts()) { ed.base = notTexts(); editStore(); ed.frame.contentWindow?.location.reload(); }
+  else edSend();
+  editFit();
+}
+function editBuild(box) {
+  editStore();
+  ed = { route: 'home', on: true, row: -1, cands: null, base: notTexts(), frame: null };
+  box.innerHTML = `
+    <nav class="m-ed-tabs" aria-label="画面">${SEE_SCREENS.map(([k, n]) => `<button data-act="ed-go" data-route="${k}" class="${k === ed.route ? 'on' : ''}">${n}</button>`).join('')}</nav>
+    <div class="m-ed-mode" role="group" aria-label="押したときの動き"><button data-act="ed-mode" data-on="1" class="on">文を押して直す</button><button data-act="ed-mode" data-on="0">アプリを動かす</button></div>
+    <div class="m-ed-frame"><iframe title="公式アプリの画面" src="${esc(editUrl(ed.route))}"></iframe></div>
+    <div id="edPanel" class="m-ed-panel">${edPanelHtml()}</div>`;
+  ed.frame = $('iframe', box);
+}
+/** 中のアプリを、スマホの幅のまま、枠に合わせて縮める */
+function editFit() {
+  if (!ed || $('#edit').hidden) return;
+  const pv = ed.frame.parentNode, s = Math.min(1, pv.clientWidth / ED_W);
+  Object.assign(ed.frame.style, {
+    width: ED_W + 'px', height: Math.ceil(pv.clientHeight / s) + 'px', transform: `scale(${s})`,
+    left: Math.max(0, Math.round((pv.clientWidth - ED_W * s) / 2)) + 'px',
+  });
+}
+addEventListener('resize', editFit);
+
+/** 直した文を、中のアプリに送る（開き直したときのために sessionStorage にも置く） */
+function edSend() {
+  if (!ed) return;
+  editStore();
+  edPost({ kind: 'texts', texts: draft.texts || {} });
+}
+
+function edPanelHtml() {
+  if (!ed || ed.row < 0) {
+    if (ed?.cands?.length) {
+      return `<p class="m-ed-q">ここには、直せる文が${ed.cands.length}つあります。どれを直しますか？</p>
+        ${ed.cands.map(i => `<button class="m-ed-cand" data-act="ed-cand" data-i="${i}"><b>${esc(oneLine(draft.texts?.[APP_TEXTS[i].t]?.to ?? APP_TEXTS[i].t))}</b><small>${esc(APP_TEXTS[i].at)}</small></button>`).join('')}`;
+    }
+    if (ed?.cands) return '<p class="m-ed-q">この字は、ここでは直せません。</p><p class="m-hint">値段・売り切れ・お知らせ・一言・特典の中身は、それぞれのタブで直します。数字や、お客様が入れた字は直せません。</p>';
+    return '<p class="m-ed-q">上の画面で、直したい文（点線で囲んだ文）を押してください。</p>';
+  }
+  const r = APP_TEXTS[ed.row], to = draft.texts?.[r.t]?.to;
+  return `<div class="m-text ${to ? 'is-edited' : ''}">
+      <div class="m-text-top"><small>${esc(r.at)}${to ? `<br>元の文：${esc(r.t)}` : ''}</small>${to ? '<button class="m-ed-undo" data-act="ed-undo">元の文に戻す</button>' : ''}</div>
+      <textarea data-f="text:to:${ed.row}" rows="${Math.min(6, Math.max(2, Math.ceil(r.t.length / 18)))}" aria-label="直した文">${esc(to ?? r.t)}</textarea>
+      <p class="m-hint">打ったそばから、上の画面の字が変わります。改行すると、アプリでも改行されます。空にすると元の文に戻ります。</p>
+    </div>`;
+}
+const edPanel = () => { const p = $('#edPanel'); if (p) p.innerHTML = edPanelHtml(); };
+const edTabs = () => $$('[data-act="ed-go"]').forEach(x => x.classList.toggle('on', x.dataset.route === ed.route));
+
+/** 押した所の字（元の字）から、文章の一覧の文を探す。全体が同じ文を先に、無ければ文の一部として入るもの（s: 1）を長い順に */
+function edRows(list) {
+  const out = [];
+  for (const raw of list) {
+    const t = String(raw).trim();
+    if (!t) continue;
+    const same = APP_TEXTS.flatMap((r, i) => (r.t === t ? [i] : []));
+    out.push(...(same.length ? same : APP_TEXTS.flatMap((r, i) => (r.s && t.includes(r.t) ? [i] : [])).sort((a, b) => APP_TEXTS[b].t.length - APP_TEXTS[a].t.length)));
+  }
+  const seen = new Set();
+  return out.filter(i => !seen.has(APP_TEXTS[i].t) && seen.add(APP_TEXTS[i].t));
+}
+/** 中のアプリで文を押したとき。1つなら、すぐ下の欄で直す。いくつかあれば選んでもらう */
+function edOnPick(d) {
+  const arr = v => (Array.isArray(v) ? v.filter(x => typeof x === 'string' && x.length <= 2000).slice(0, 20) : []);
+  const main = edRows(arr(d.main)), attrs = edRows(arr(d.attrs));
+  const rows = edRows([...(main.length ? main : edRows(arr(d.more))), ...attrs].map(i => APP_TEXTS[i].t)).slice(0, 8);
+  ed.cands = rows;
+  ed.row = rows.length === 1 ? rows[0] : -1;
+  edPanel();
+  edPost({ kind: 'pick', ...edKey(ed.row) });
+  // 中のアプリと直す欄が、いっしょに見えるところへ（上の帯とタブの下から）
+  const top = $('#edit').getBoundingClientRect().top, under = $('.m-tabs')?.getBoundingClientRect().bottom || 0;
+  if (Math.abs(top - under - 8) > 40) window.scrollTo({ top: window.scrollY + top - under - 8, behavior: 'smooth' });
+}
+function edAct(b) {
+  if (!ed) return;
+  const act = b.dataset.act;
+  if (act === 'ed-go') { ed.route = b.dataset.route; edTabs(); return edPost({ kind: 'go', route: ed.route }); }
+  if (act === 'ed-mode') {
+    ed.on = b.dataset.on === '1';
+    $$('[data-act="ed-mode"]').forEach(x => x.classList.toggle('on', x === b));
+    return edPost({ kind: 'mode', on: ed.on });
+  }
+  if (act === 'ed-cand') { ed.row = Number(b.dataset.i); edPanel(); return edPost({ kind: 'pick', ...edKey(ed.row) }); }
+  if (act === 'ed-undo' && ed.row >= 0) {
+    const t = $('#edPanel textarea');
+    t.value = APP_TEXTS[ed.row].t;
+    take(t);
+    drawBar();
+    edSend();
+    edPanel();
+  }
+}
+addEventListener('message', e => {
+  if (!ed || e.source !== ed.frame?.contentWindow || e.origin !== location.origin) return;
+  const d = e.data || {};
+  if (d.type !== 'baguru-edit') return;
+  if (d.kind === 'ready') {   // 中のアプリが開いた（開き直した）とき：直せる文の一覧・押したときの動き・直した文・直している文を渡す
+    edPost({ kind: 'keys', exact: APP_TEXTS.map(r => r.t), part: APP_TEXTS.filter(r => r.s).map(r => r.t) });
+    edPost({ kind: 'mode', on: ed.on });
+    edSend();
+    edPost({ kind: 'pick', ...edKey(ed.row) });
+  }
+  if ((d.kind === 'ready' || d.kind === 'route') && typeof d.route === 'string') { ed.route = d.route; edTabs(); }
+  if (d.kind === 'pick') edOnPick(d);
+});
 
 /* ---- 直す ---- */
 
@@ -403,7 +545,11 @@ function take(el) {
 
 document.addEventListener('input', e => {
   if (e.target.id === 'textSearch') { textQuery = e.target.value; $('#textList').innerHTML = textListHtml(); return; }   // 探す欄から指が離れないように、一覧だけ描き直す
-  if (e.target.dataset.f && server) { take(e.target); drawBar(); }
+  if (e.target.dataset.f && server) {
+    take(e.target);
+    drawBar();
+    if (e.target.dataset.f.startsWith('text:')) edSend();   // 画面で直す：打ったそばから、中のアプリの字を変える
+  }
 });
 document.addEventListener('change', e => {
   if (e.target.id === 'textOnly') { textOnly = e.target.checked; return render(); }
@@ -411,6 +557,7 @@ document.addEventListener('change', e => {
   take(e.target);
   if (e.target.dataset.f.startsWith('text:')) {   // 文章のタブは、書いている場所が動かないように描き直さない
     e.target.closest('.m-text').classList.toggle('is-edited', !!draft.texts?.[APP_TEXTS[Number(e.target.dataset.f.split(':')[2])].t]);
+    if (e.target.closest('#edPanel')) edPanel();   // 画面で直す：「元の文」と「元の文に戻す」を出し入れする
     return drawBar();
   }
   render();
@@ -431,6 +578,8 @@ document.addEventListener('click', e => {
   if (b.dataset.act === 'see-go') return openSee(b.dataset.route);
   if (b.dataset.act === 'see-close') return closeSee();
   if (b.dataset.act === 'see-text') { const r = APP_TEXTS[Number(b.dataset.i)]; return openSee(SEE_AT[r.at] || 'home', draft.texts?.[r.t]?.to || r.t); }
+  if (b.dataset.act === 'text-mode') { textMode = b.dataset.mode; return render(); }
+  if (b.dataset.act?.startsWith('ed-')) return edAct(b);
   if (b.dataset.act === 'text-group') {
     if (!textOpen.delete(b.dataset.at)) textOpen.add(b.dataset.at);
     return render();
