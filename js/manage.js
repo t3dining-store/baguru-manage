@@ -168,12 +168,12 @@ function savePeople() {
 }
 
 /* ---- アプリで見る：保存する前の直しを入れた公式アプリを、画面の中に開く（改行などの見え方を確かめる）。★お客様には見えない ---- */
-const SEE_SCREENS = [['join', '登録'], ['home', 'ホーム'], ['menu', 'テイクアウト'], ['menu/dine', '店内のメニュー'], ['cart', 'カート'], ['reserve', '予約'], ['stamp', 'スタンプ'], ['shop', 'お店の情報'], ['me', 'マイページ']];   // 公式アプリの下のタブは 2026-11-04 から ホーム・メニュー・予約・スタンプ・マイページ
+const SEE_SCREENS = [['join', '登録'], ['home', 'ホーム'], ['menu', 'テイクアウト'], ['menu/dine', '店内のメニュー'], ['cart', 'カート'], ['reserve', '予約'], ['stamp', 'スタンプ'], ['shop', 'お店の情報'], ['recruit', '採用情報'], ['me', 'マイページ']];   // 公式アプリの下のタブは 2026-11-04 から ホーム・メニュー・予約・スタンプ・マイページ
 const SEE_TAB = { notice: 'home', news: 'home', items: 'menu', choices: 'menu', dine: 'menu/dine', rewards: 'stamp', texts: 'home', photos: 'menu' };
 const SEE_AT = {
   'ホーム': 'home', 'テイクアウトのメニュー': 'menu', 'テイクアウトのメニュー（名前と説明）': 'menu', '商品を選ぶ画面': 'menu', 'アレルギー': 'menu', 'カート': 'cart', '受け取りとお名前': 'checkout',
   '注文の様子': 'me', '配達・大量注文の申請': 'request', 'スタンプ': 'stamp', 'スタンプのQR': 'stamp', 'スタンプの決まり': 'stamp', 'お店の情報': 'shop', 'お店の情報（もとの設定）': 'shop',
-  '店内のメニュー（名前と説明）': 'menu/dine', 'ネット予約': 'reserve', 'マイページ': 'me',
+  '店内のメニュー（名前と説明）': 'menu/dine', 'ネット予約': 'reserve', 'マイページ': 'me', '採用情報': 'recruit',
 };
 const seeUrl = route => (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)
   ? `../index.html?${/[?&]test\b/.test(location.search) ? 'test&' : ''}preview#${route}`
