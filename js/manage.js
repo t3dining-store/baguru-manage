@@ -19,7 +19,7 @@ const clone = o => JSON.parse(JSON.stringify(o ?? {}));
 const canon = o => JSON.stringify(o, (k, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map(x => [x, v[x]])) : v));
 
 /* ---- バグる Owner（オーナー用の入口）から開いたときだけ「🏠 ホーム」（公式アプリ・Order受付と同じ印。sessionStorage の bg.fromOwner） ---- */
-const OWNER_HOME = 'https://t3dining.github.io/baguru-owner/';
+const OWNER_HOME = 'https://t3dining-store.github.io/baguru-owner/';   // 2026-11-05 お店用アプリの引っ越し（段階2）で新しい場所に。前は t3dining.github.io/baguru-owner/
 const fromOwner = (() => {
   try {
     if (/[?&]from=owner\b/.test(location.search)) sessionStorage.setItem('bg.fromOwner', '1');
