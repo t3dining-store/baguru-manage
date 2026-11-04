@@ -46,7 +46,9 @@ const MSG = {
   bad_pin: '合言葉が違います。',
   locked: '何度も違ったため、しばらく使えません。時間を置いてから、もう一度お試しください。',
   not_setup: '受け口の準備（setup）がまだです。予約ボードのセッションの案内を見てください。',
-  unknown_action: '受け口が、まだ新しい版（2026-10-30j 以降）になっていません。予約ボードのセッションの案内で、Google の受け口を入れ替えてください。',
+  unknown_action: '受け口が、まだ新しい版になっていません。予約ボードのセッションの案内で、Google の受け口を入れ替えてください。',
+  bad_image: 'この写真は読めませんでした。ほかの写真か、JPEG・PNG の写真を選んでください。',
+  too_large: '写真が大きすぎて送れませんでした。ほかの写真を選んでください。',
   too_big: '中身が多すぎて保存できません。お知らせを減らしてください。',
   bad_input: '中身の形が違うため、保存できませんでした。',
   not_ready: '受け口の場所を読めませんでした。少し時間を置いてから、もう一度お試しください。',
@@ -85,8 +87,10 @@ const sameList = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 /* ---- 描く ---- */
 const MEMBER_PLUS = !!STAMP.memberPlus || (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) && /[?&]test\b/.test(location.search));   // 公式アプリの js/stamp-api.js と同じ
+const PHOTO_EDIT = !!SHOP.photoEdit || (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) && /[?&]test\b/.test(location.search));   // 受け口に savePhoto が入るまでは、この Mac の ?test だけ
 const TABS = [
   ['notice', '一言'], ['news', 'お知らせ'], ['items', 'テイクアウト'], ['choices', '選ぶもの'], ['dine', '店内'], ['rewards', '特典'], ['texts', '文章'],
+  ...(PHOTO_EDIT ? [['photos', '写真']] : []),
   ...(MEMBER_PLUS ? [['people', '客層']] : []),
 ];
 
@@ -97,7 +101,7 @@ function render() {
   const y = window.scrollY;
   view.innerHTML = `
     <nav class="m-tabs">${TABS.map(([k, n]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${n}</button>`).join('')}</nav>
-    ${({ notice: noticeHtml, news: newsHtml, items: itemsHtml, choices: choicesHtml, dine: dineHtml, rewards: rewardsHtml, texts: textsHtml, people: peopleHtml })[tab]()}`;
+    ${({ notice: noticeHtml, news: newsHtml, items: itemsHtml, choices: choicesHtml, dine: dineHtml, rewards: rewardsHtml, texts: textsHtml, photos: photosHtml, people: peopleHtml })[tab]()}`;
   // 下の字は #foot に（文章の「画面で直す」のときは、中のアプリの下に出る）
   $('#foot').innerHTML = `<p class="m-foot"><button class="m-link" data-act="forget">この端末の合言葉を消す</button><br><a href="${esc(appUrl())}" target="_blank" rel="noopener">公式アプリで見る ›</a><br>
       保存すると、公式アプリには数分のうちに出ます（開いている人は、開き直したときに）。値段はホームページには出ません（ホームページは別に直します）。</p>`;
@@ -165,7 +169,7 @@ function savePeople() {
 
 /* ---- アプリで見る：保存する前の直しを入れた公式アプリを、画面の中に開く（改行などの見え方を確かめる）。★お客様には見えない ---- */
 const SEE_SCREENS = [['join', '登録'], ['home', 'ホーム'], ['menu', 'メニュー'], ['cart', 'カート'], ['stamp', 'スタンプ'], ['shop', 'お店'], ['me', 'マイページ'], ['reserve', '予約']];
-const SEE_TAB = { notice: 'home', news: 'home', items: 'menu', choices: 'menu', dine: 'shop', rewards: 'stamp', texts: 'home' };
+const SEE_TAB = { notice: 'home', news: 'home', items: 'menu', choices: 'menu', dine: 'shop', rewards: 'stamp', texts: 'home', photos: 'menu' };
 const SEE_AT = {
   'ホーム': 'home', 'テイクアウトのメニュー': 'menu', 'テイクアウトのメニュー（名前と説明）': 'menu', '商品を選ぶ画面': 'menu', 'アレルギー': 'menu', 'カート': 'cart', '受け取りとお名前': 'checkout',
   '注文の様子': 'me', '配達・大量注文の申請': 'request', 'スタンプ': 'stamp', 'スタンプのQR': 'stamp', 'スタンプの決まり': 'stamp', 'お店の情報': 'shop', 'お店の情報（もとの設定）': 'shop',
@@ -242,21 +246,77 @@ function newsHtml() {
     </section>`;
 }
 
+/* ---- 商品を足す・消す・並べる（2026-11-04 ko-dai さんの指示：「商品の追加や削除、同カテゴリー内での順番の入れ替え、カテゴリー自体の順番の入れ替え」） ----
+ *  中身は draft.menu（形は ../js/content.js の applyMenu の頭）。並びは ↑↓ で入れかえる。data.js と同じ並びに戻ったら、その並びは消す（中身を小さく）。
+ *  data.js の商品を消すと removed に入り、下の「消した商品」から戻せる。足した商品を消すと、その商品の写真・売り切れの直しも消す */
+const menuDraft = () => draft.menu || {};
+/** draft.menu の key に val を入れる。空・もとと同じなら消す */
+function setMenu(key, val) {
+  draft.menu ??= {};
+  const empty = val == null || (Array.isArray(val) && !val.length) || (typeof val === 'object' && !Array.isArray(val) && !Object.keys(val).length);
+  if (empty) delete draft.menu[key]; else draft.menu[key] = val;
+  if (!Object.keys(draft.menu).length) delete draft.menu;
+}
+const newMenuId = head => head + '_' + [...crypto.getRandomValues(new Uint8Array(6))].map(b => (b % 36).toString(36)).join('') + Date.now().toString(36).slice(-4);
+/** テイクアウトのカテゴリー（並べた順） */
+const mCats = () => orderBy(CATEGORIES, c => c.id, menuDraft().cats);
+/** そのカテゴリーの商品（並べた順。足した商品も。消したものは入れない）。足した商品は { add: 中身 } */
+function mItems(catId, ordered = true) {   // ordered：false なら、data.js の順（足した商品は後ろ）
+  const m = menuDraft(), removed = new Set(m.removed || []);
+  const list = [...ITEMS.filter(i => i.cat === catId && !removed.has(i.id)), ...(m.added || []).filter(a => a.cat === catId).map(a => ({ id: a.id, add: a }))];
+  return ordered ? orderBy(list, x => x.id, (m.order || {})[catId]) : list;
+}
+/** 並びの中で、key のものを dir（-1 上・1 下）へ動かした並びを返す */
+function moved(keys, key, dir) {
+  const list = keys.slice(), i = list.indexOf(key), j = i + dir;
+  if (i < 0 || j < 0 || j >= list.length) return list;
+  [list[i], list[j]] = [list[j], list[i]];
+  return list;
+}
+const moveBtns = (act, key, i, n, del = '') => `<span class="m-move"><button data-act="${act}" data-key="${esc(key)}" data-dir="-1" ${i === 0 ? 'disabled' : ''} aria-label="上へ">↑</button><button data-act="${act}" data-key="${esc(key)}" data-dir="1" ${i === n - 1 ? 'disabled' : ''} aria-label="下へ">↓</button>${del}</span>`;
+// 足した商品の「選ぶもの」：data.js の商品の選ぶもの（サイズのある商品は、'acai' で）
+const LIKE_OPTS = () => [['', '選ぶものなし'], ...ITEMS.filter(i => i.groups.length && !i.groups.some(g => g.id === 'size')).map(i => [i.id, `${i.full || i.name}と同じ`]), ['acai', 'アサイーボウルと同じ（サイズとトッピング）']];
+
 function itemsHtml() {
-  return CATEGORIES.map(cat => `<section class="m-sec">
+  const cats = mCats(), m = menuDraft();
+  const catRows = cats.map((c, i) => `<div class="m-order-row"><b>${esc(c.name)}</b>${moveBtns('cat-move', c.id, i, cats.length)}</div>`).join('');
+  const removed = ITEMS.filter(i => (m.removed || []).includes(i.id));
+  return `<section class="m-sec"><h2>カテゴリーの順番</h2><p class="m-hint">公式アプリのテイクアウトのメニューに、この順で出ます。</p>${catRows}</section>`
+    + cats.map(cat => {
+      const list = mItems(cat.id);
+      return `<section class="m-sec">
       <h2>${esc(cat.name)}</h2>
-      ${ITEMS.filter(i => i.cat === cat.id).map(i => {
-        const b = CONTENT_BASE.items[ITEMS.indexOf(i)], o = ov('items', i.id);
+      ${list.map((x, n) => {
+        const o = ov('items', x.id), del = `<button data-act="item-del" data-key="${esc(x.id)}" class="danger">削除</button>`, mv = moveBtns('item-move', `${cat.id}|${x.id}`, n, list.length, del);
+        if (x.add) {   // 足した商品：名前なども、ここで直す
+          const a = x.add, acaiLike = a.like === 'acai';
+          return `<div class="m-row m-added ${o.hidden ? 'is-hidden' : ''} ${o.soldOut ? 'is-out' : ''}">
+              <div class="m-name m-name-row"><span class="m-new">足した商品</span>${mv}</div>
+              <label class="m-field m-wide"><span>名前</span><input type="text" data-f="add:name:${esc(a.id)}" value="${esc(a.name)}" maxlength="60" placeholder="例：チーズハンバーグBOX"></label>
+              <label class="m-field m-wide"><span>名前の下の小さな字（なくても構いません）</span><input type="text" data-f="add:sub:${esc(a.id)}" value="${esc(a.sub || '')}" maxlength="40" placeholder="例：ごはん付き"></label>
+              <label class="m-field m-wide"><span>説明（なくても構いません）</span><input type="text" data-f="add:desc:${esc(a.id)}" value="${esc(a.desc || '')}" maxlength="120"></label>
+              <label class="m-field m-wide"><span>選ぶもの（ソース・ご飯の量など）</span><select data-f="add:like:${esc(a.id)}">${LIKE_OPTS().map(([v, t]) => `<option value="${esc(v)}" ${(a.like || '') === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
+              <div class="m-prices">${addPriceIn(`add:price:${a.id}`, a.price, acaiLike ? 'ミニ' : '')}${acaiLike ? addPriceIn(`add:regular:${a.id}`, a.regular, 'レギュラー') : ''}</div>
+              <div class="m-flags">${flagIn(`item:soldOut:${a.id}`, o.soldOut, '売り切れ')}${flagIn(`item:hidden:${a.id}`, o.hidden, '出さない')}</div>
+            </div>`;
+        }
+        const i = ITEM_BY_ID[x.id], b = CONTENT_BASE.items[ITEMS.indexOf(i)];
         return `<div class="m-row ${o.hidden ? 'is-hidden' : ''} ${o.soldOut ? 'is-out' : ''}">
-            <b class="m-name">${esc(i.full || i.name)}</b>
+            <div class="m-name m-name-row"><b>${esc(i.full || i.name)}</b>${mv}</div>
             <div class="m-prices">${b.regular != null
               ? priceIn(`item:price:${i.id}`, o.price, b.price, 'ミニ') + priceIn(`item:regular:${i.id}`, o.regular, b.regular, 'レギュラー')
               : priceIn(`item:price:${i.id}`, o.price, b.price)}</div>
             <div class="m-flags">${flagIn(`item:soldOut:${i.id}`, o.soldOut, '売り切れ')}${flagIn(`item:hidden:${i.id}`, o.hidden, '出さない')}</div>
           </div>`;
       }).join('')}
-    </section>`).join('') + '<p class="m-hint">「売り切れ」は、メニューに出したまま押せなくします。「出さない」は、メニューに並べません。どちらも、戻すまでそのままです。</p>';
+      <button class="m-btn m-sub" data-act="item-add" data-cat="${esc(cat.id)}">＋ ${esc(cat.name)}に商品を足す</button>
+    </section>`;
+    }).join('')
+    + (removed.length ? `<section class="m-sec"><h2>消した商品</h2><p class="m-hint">公式アプリには出ません。「戻す」で、もとの場所に戻ります。</p>${removed.map(i => `<div class="m-order-row"><b>${esc(i.full || i.name)}</b><button class="m-btn m-sub m-back" data-act="item-back" data-key="${esc(i.id)}">戻す</button></div>`).join('')}</section>` : '')
+    + '<p class="m-hint">「売り切れ」は、メニューに出したまま押せなくします。「出さない」は、メニューに並べません。どちらも、戻すまでそのままです。「削除」は、メニューから外します（data.js の商品は、下の「消した商品」から戻せます）。足した商品の写真は「写真」のタブで入れます。</p>';
 }
+/** 足した商品の値段の欄（もとの値段が無いので、直した印は付けない） */
+const addPriceIn = (f, v, label = '') => `<label class="m-price">${label ? `<em>${esc(label)}</em>` : ''}<span>¥</span><input type="text" inputmode="numeric" data-f="${esc(f)}" value="${v ?? ''}" placeholder="0" aria-label="${label || '値段'}"></label>`;
 
 function choicesHtml() {
   return `<p class="m-hint">ご飯の量・セット・トッピングなど、商品を選ぶ画面で選ぶものです。同じものを使う商品すべてに効きます。「なし」「普通」は直せません。</p>`
@@ -279,21 +339,49 @@ function choicesHtml() {
     }).join('');
 }
 
+/** 店内のメニューの見出し（並べた順） */
+const mDineCats = () => orderBy(DINE_IN, c => c.name, menuDraft().dineCats);
+/** その見出しの品（並べた順。足した品も。消したものは入れない）。key は並びに使う字（data.js の品は名前、足した品は id） */
+function mDine(cat, ordered = true) {
+  const m = menuDraft(), removed = new Set(m.dineRemoved || []);
+  const list = [...cat.items.filter(it => !removed.has(contentKey.dine(cat, it))).map(it => ({ key: it.n, it })), ...(m.dineAdded || []).filter(a => a.cat === cat.name).map(a => ({ key: a.id, add: a }))];
+  return ordered ? orderBy(list, x => x.key, (m.dineOrder || {})[cat.name]) : list;
+}
 function dineHtml() {
-  return '<p class="m-hint">お店の情報の「店内のメニュー」（見るだけのメニュー）です。</p>' + DINE_IN.map((cat, a) => `<section class="m-sec">
+  const cats = mDineCats(), m = menuDraft();
+  const removed = DINE_IN.flatMap(cat => cat.items.filter(it => (m.dineRemoved || []).includes(contentKey.dine(cat, it))).map(it => ({ cat, it })));
+  return '<p class="m-hint">お店の情報の「店内のメニュー」（見るだけのメニュー）です。</p>'
+    + `<section class="m-sec"><h2>見出しの順番</h2>${cats.map((c, i) => `<div class="m-order-row"><b>${esc(c.name)}</b>${moveBtns('dcat-move', c.name, i, cats.length)}</div>`).join('')}</section>`
+    + cats.map(cat => {
+      const list = mDine(cat), a0 = DINE_IN.indexOf(cat);
+      return `<section class="m-sec">
       <h2>${esc(cat.name)}</h2>
-      ${cat.items.map((it, b) => {
-        const base = CONTENT_BASE.dine[a][b], key = contentKey.dine(cat, it), o = ov('dine', key);
+      ${list.map((x, n) => {
+        const del = `<button data-act="dine-del" data-key="${esc(cat.name + '|' + x.key)}" class="danger">削除</button>`, mv = moveBtns('dine-move', `${cat.name}|${x.key}`, n, list.length, del);
+        if (x.add) {
+          const a = x.add, key = `${cat.name}/${a.n}`, o = ov('dine', key);
+          return `<div class="m-row m-added ${o.hidden ? 'is-hidden' : ''}">
+              <div class="m-name m-name-row"><span class="m-new">足した品</span>${mv}</div>
+              <label class="m-field m-wide"><span>名前</span><input type="text" data-f="dadd:n:${esc(a.id)}" value="${esc(a.n)}" maxlength="60"></label>
+              <label class="m-field m-wide"><span>説明（なくても構いません）</span><input type="text" data-f="dadd:d:${esc(a.id)}" value="${esc(a.d || '')}" maxlength="120"></label>
+              <div class="m-prices">${addPriceIn(`dadd:p:${a.id}`, a.p)}</div>
+              <div class="m-flags">${flagIn(`dine:hidden:${key}`, o.hidden, '出さない')}</div>
+            </div>`;
+        }
+        const it = x.it, b = cat.items.indexOf(it), base = CONTENT_BASE.dine[a0][b], key = contentKey.dine(cat, it), o = ov('dine', key);
         const prices = base.sizes
-          ? it.sizes.map((s, k) => priceIn(`dine:size:${key}:${k}`, Array.isArray(o.sizes) ? o.sizes[k] ?? null : null, base.sizes[k], s[0])).join('')
+          ? it.sizes.map((sz, k) => priceIn(`dine:size:${key}:${k}`, Array.isArray(o.sizes) ? o.sizes[k] ?? null : null, base.sizes[k], sz[0])).join('')
           : priceIn(`dine:p:${key}`, o.p, base.p);
         return `<div class="m-row ${o.hidden ? 'is-hidden' : ''}">
-            <b class="m-name">${esc(it.n)}</b>
+            <div class="m-name m-name-row"><b>${esc(it.n)}</b>${mv}</div>
             <div class="m-prices">${prices}</div>
             <div class="m-flags">${flagIn(`dine:hidden:${key}`, o.hidden, '出さない')}</div>
           </div>`;
       }).join('')}
-    </section>`).join('');
+      <button class="m-btn m-sub" data-act="dine-add" data-cat="${esc(cat.name)}">＋ ${esc(cat.name)}に品を足す</button>
+    </section>`;
+    }).join('')
+    + (removed.length ? `<section class="m-sec"><h2>消した品</h2><p class="m-hint">公式アプリには出ません。「戻す」で、もとの場所に戻ります。</p>${removed.map(({ cat, it }) => `<div class="m-order-row"><b>${esc(cat.name)}：${esc(it.n)}</b><button class="m-btn m-sub m-back" data-act="dine-back" data-key="${esc(contentKey.dine(cat, it))}">戻す</button></div>`).join('')}</section>` : '');
 }
 
 function rewardsHtml() {
@@ -308,6 +396,91 @@ function rewardsHtml() {
           ${Object.keys(o).length ? `<button class="m-btn m-sub" data-act="reward-reset" data-at="${r.at}">もとに戻す</button>` : ''}
         </section>`;
     }).join('');
+}
+
+/* ---- 写真（2026-11-04 ko-dai さんの指示：「マネージで写真も変更できるように」） ----
+ *  選んだ写真は、端末の中で長い辺を PHOTO_MAX まで縮めて JPEG にし、すぐ受け口の savePhoto へ送る（受け口が Google ドライブに置き、id を返す）。
+ *  どの写真を使うかは、ほかの直しと同じく draft の photos（{ 場所: { id } }）に入れ、上の「保存」で公式アプリに出る（それまでは、お客様には見えない）。
+ *  出すときの URL は、公式アプリの content.js の photoUrl（1か所だけ）。data.js の写真は img/menu/ の名前のまま */
+const PHOTO_MAX = 1600, PHOTO_BYTES = 2 * 1024 * 1024;   // 受け口が受ける大きさは1枚 2MB まで（版 2026-11-04b）
+let photoBusy = '', photoErr = {};
+const PHOTO_MSG = {
+  bad_type: 'この写真の種類は送れません。JPEG・PNG の写真を選んでください。',
+  bad_input: 'この写真は送れませんでした。ほかの写真を選んでください。',
+  too_big: '写真が大きすぎて送れませんでした。ほかの写真を選んでください。',
+  busy: '写真を続けて送りすぎました。10分ほど待ってから、もう一度選んでください。',
+  share_failed: 'Google ドライブで、写真をアプリに出せる形にできませんでした。予約ボードのセッションに知らせてください。',
+  not_setup: '受け口の準備（setup）がまだです。予約ボードのセッションの案内で、setup を動かしてください。',
+};
+/** 写真の場所の一覧 { slot, name, base（data.js の写真。無ければ ''） } */
+function photoSlots() {
+  return [
+    { head: 'お店の写真', rows: [{ slot: 'hero', name: 'ホームのいちばん上の大きな写真', base: CONTENT_BASE.photos.hero }, { slot: 'shop', name: 'お店の情報の写真', base: CONTENT_BASE.photos.shop }] },
+    ...mCats().map(cat => ({ head: `テイクアウト：${cat.name}`, rows: mItems(cat.id).map(x => (x.add
+      ? { slot: 'item:' + x.id, name: x.add.name || '（名前のない足した商品）', base: '' }
+      : { slot: 'item:' + x.id, name: ITEM_BY_ID[x.id].full || ITEM_BY_ID[x.id].name, base: CONTENT_BASE.photos.items[ITEMS.indexOf(ITEM_BY_ID[x.id])].img })) })),
+    ...mDineCats().map(cat => ({ head: `店内のメニュー：${cat.name}`, rows: mDine(cat).map(x => (x.add
+      ? { slot: 'dine:' + `${cat.name}/${x.add.n}`, name: x.add.n || '（名前のない足した品）', base: '' }
+      : { slot: 'dine:' + contentKey.dine(cat, x.it), name: x.it.n, base: CONTENT_BASE.photos.dine[DINE_IN.indexOf(cat)][cat.items.indexOf(x.it)] })) })),
+  ].filter(g => g.rows.length);
+}
+/** data.js の写真の場所（公式アプリの公開先か、この Mac の ../） */
+const appImg = img => !img ? '' : /^https:\/\//.test(img) ? img : (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '../' : SHOP.appUrl) + (img.startsWith('img/') ? img : 'img/menu/' + img);
+const photoNow = slot => { const id = draft.photos?.[slot]?.id; return typeof id === 'string' && PHOTO_ID.test(id) ? photoUrl(id) : ''; };
+
+function photosHtml() {
+  return `<p class="m-hint">公式アプリの写真を入れかえます。「写真を選ぶ」で選んだ写真は、すぐ受け口（Google ドライブ）に送ります。お客様に見えるのは、上の「保存」を押してからです。写真の無い商品にも足せます。</p>
+    <p class="m-hint">写真は、長い辺を${PHOTO_MAX}px までに縮めて送ります。商品の写真は、横長か正方形がきれいに出ます。</p>`
+    + photoSlots().map(g => `<section class="m-sec"><h2>${esc(g.head)}</h2>${g.rows.map(r => {
+      const now = photoNow(r.slot), src = now || appImg(r.base), busyHere = photoBusy === r.slot;
+      return `<div class="m-photo ${now ? 'is-changed' : ''}">
+          ${src ? `<img src="${esc(src)}" alt="" loading="lazy">` : '<span class="m-photo-none">写真なし</span>'}
+          <div class="m-photo-name"><b>${esc(r.name)}</b><small>${busyHere ? '送っています…' : now ? '入れかえた写真' : r.base ? 'もとの写真' : ''}</small>${photoErr[r.slot] ? `<small class="m-photo-err">${esc(photoErr[r.slot])}</small>` : ''}</div>
+          <div class="m-photo-btns">
+            <label class="m-btn m-sub ${busyHere || photoBusy ? 'is-off' : ''}">写真を選ぶ<input type="file" accept="image/*" data-photo="${esc(r.slot)}" ${photoBusy ? 'disabled' : ''} hidden></label>
+            ${now ? `<button class="m-btn m-sub" data-act="photo-reset" data-slot="${esc(r.slot)}">もとに戻す</button>` : ''}
+          </div>
+        </div>`;
+    }).join('')}</section>`).join('');
+}
+/** 写真を縮めて JPEG の base64 にする（iPhone の写真の向きは、ブラウザが直してから描く） */
+async function shrinkPhoto(file) {
+  const img = await new Promise((ok, ng) => {
+    const u = URL.createObjectURL(file), im = new Image();
+    im.onload = () => { URL.revokeObjectURL(u); ok(im); };
+    im.onerror = () => { URL.revokeObjectURL(u); ng(Object.assign(new Error('bad_image'), { code: 'bad_image' })); };
+    im.src = u;
+  });
+  // 2MB を超えるときは、すこしずつ縮める（ふつうの写真は、はじめの形で 1MB より小さい）
+  for (const [side, q] of [[PHOTO_MAX, 0.82], [PHOTO_MAX, 0.7], [1280, 0.7], [1024, 0.6]]) {
+    const k = Math.min(1, side / Math.max(img.naturalWidth, img.naturalHeight));
+    const cv = document.createElement('canvas');
+    cv.width = Math.max(1, Math.round(img.naturalWidth * k));
+    cv.height = Math.max(1, Math.round(img.naturalHeight * k));
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    const data = cv.toDataURL('image/jpeg', q).split(',')[1];
+    if (data.length * 3 / 4 <= PHOTO_BYTES * 0.95) return data;
+  }
+  throw Object.assign(new Error('too_big'), { code: 'too_big' });
+}
+async function choosePhoto(input) {
+  const slot = input.dataset.photo, file = input.files?.[0];
+  input.value = '';
+  if (!file || photoBusy || !server) return;
+  photoBusy = slot;
+  delete photoErr[slot];
+  render();
+  try {
+    const data = await shrinkPhoto(file);
+    const r = await post({ action: 'savePhoto', pin, slot, type: 'image/jpeg', data });
+    if (typeof r.id !== 'string' || !PHOTO_ID.test(r.id)) throw Object.assign(new Error('no_answer'), { code: 'no_answer' });
+    setOv('photos', slot, 'id', r.id);
+  } catch (err) {
+    photoErr[slot] = PHOTO_MSG[err.code] || message(err);
+    if (err.code === 'bad_pin' || err.code === 'locked') { alert(message(err)); server = null; pin = ''; if (err.code === 'bad_pin') pinSet(''); }
+  }
+  photoBusy = '';
+  render();
 }
 
 /* ---- 文章：アプリの画面に出る文を全部直せる（一覧は js/texts.js。道具/文章を集める.py が作る） ---- */
@@ -629,6 +802,62 @@ addEventListener('message', e => {
   if (d.kind === 'pick') edOnPick(d);
 });
 
+/** 商品を並べる・足す・消す・戻すボタン。動いたら true */
+function menuAct(b) {
+  const act = b.dataset.act, key = b.dataset.key || '', dir = Number(b.dataset.dir), m = menuDraft();
+  if (act === 'cat-move') { const ids = moved(mCats().map(c => c.id), key, dir); setMenu('cats', canon(ids) === canon(CATEGORIES.map(c => c.id)) ? null : ids); return true; }
+  if (act === 'dcat-move') { const ns = moved(mDineCats().map(c => c.name), key, dir); setMenu('dineCats', canon(ns) === canon(DINE_IN.map(c => c.name)) ? null : ns); return true; }
+  if (act === 'item-move') {   // data.js の順（足した商品は後ろ）に戻ったら、並びは消す
+    const [cat, id] = key.split('|'), ids = moved(mItems(cat).map(x => x.id), id, dir), order = { ...(m.order || {}) };
+    if (canon(ids) === canon(mItems(cat, false).map(x => x.id))) delete order[cat]; else order[cat] = ids;
+    setMenu('order', order);
+    return true;
+  }
+  if (act === 'dine-move') {
+    const i = key.indexOf('|'), cat = DINE_IN.find(c => c.name === key.slice(0, i)), k = key.slice(i + 1), keys = moved(mDine(cat).map(x => x.key), k, dir), order = { ...(m.dineOrder || {}) };
+    if (canon(keys) === canon(mDine(cat, false).map(x => x.key))) delete order[cat.name]; else order[cat.name] = keys;
+    setMenu('dineOrder', order);
+    return true;
+  }
+  if (act === 'item-add') {
+    setMenu('added', [...(m.added || []), { id: newMenuId('n'), cat: b.dataset.cat, name: '', price: null, like: '' }]);   // 値段は入れてもらう（空のままでは保存しない）
+    return true;
+  }
+  if (act === 'dine-add') {
+    setMenu('dineAdded', [...(m.dineAdded || []), { id: newMenuId('m'), cat: b.dataset.cat, n: '', p: null }]);
+    return true;
+  }
+  if (act === 'item-del') {
+    const a = (m.added || []).find(x => x.id === key), name = a ? a.name || '（名前のない商品）' : ITEM_BY_ID[key]?.full || ITEM_BY_ID[key]?.name;
+    if (!confirm(`「${name}」をメニューから削除します。${a ? '足した商品なので、もとには戻せません。' : '下の「消した商品」から戻せます。'}よろしいですか？`)) return true;
+    if (a) {
+      setMenu('added', (m.added || []).filter(x => x.id !== key));
+      setOv('items', key, 'soldOut', undefined); setOv('items', key, 'hidden', undefined);
+      if (draft.photos) { delete draft.photos['item:' + key]; if (!Object.keys(draft.photos).length) delete draft.photos; }
+    } else setMenu('removed', [...(m.removed || []), key]);
+    const order = { ...(m.order || {}) };
+    Object.keys(order).forEach(c => { order[c] = order[c].filter(x => x !== key); if (!order[c].length) delete order[c]; });
+    setMenu('order', order);
+    return true;
+  }
+  if (act === 'item-back') { setMenu('removed', (m.removed || []).filter(x => x !== key)); return true; }
+  if (act === 'dine-del') {
+    const i = key.indexOf('|'), catName = key.slice(0, i), k = key.slice(i + 1), a = (m.dineAdded || []).find(x => x.id === k);
+    if (!confirm(`「${a ? a.n || '（名前のない品）' : k}」を店内のメニューから削除します。${a ? '足した品なので、もとには戻せません。' : '下の「消した品」から戻せます。'}よろしいですか？`)) return true;
+    if (a) {
+      setMenu('dineAdded', (m.dineAdded || []).filter(x => x.id !== k));
+      const dk = `${catName}/${a.n}`;
+      if (draft.dine?.[dk]) { delete draft.dine[dk]; if (!Object.keys(draft.dine).length) delete draft.dine; }
+      if (draft.photos) { delete draft.photos['dine:' + dk]; if (!Object.keys(draft.photos).length) delete draft.photos; }
+    } else setMenu('dineRemoved', [...(m.dineRemoved || []), `${catName}/${k}`]);
+    const order = { ...(m.dineOrder || {}) };
+    if (order[catName]) { order[catName] = order[catName].filter(x => x !== k); if (!order[catName].length) delete order[catName]; }
+    setMenu('dineOrder', order);
+    return true;
+  }
+  if (act === 'dine-back') { setMenu('dineRemoved', (m.dineRemoved || []).filter(x => x !== key)); return true; }
+  return false;
+}
 /* ---- 直す ---- */
 
 /** 入れた値を draft に写す。値段は、もとと同じなら消す。チェックは、外したら消す */
@@ -642,6 +871,19 @@ function take(el) {
     if (!to || to === r.t) delete draft.texts[r.t]; else draft.texts[r.t] = { to, s: r.s };
     if (!Object.keys(draft.texts).length) delete draft.texts;
     return;
+  }
+  if (kind === 'add' || kind === 'dadd') {   // 足した商品（テイクアウト）・足した品（店内）
+    const listKey = kind === 'add' ? 'added' : 'dineAdded', list = (menuDraft()[listKey] || []).map(x => ({ ...x })), a = list.find(x => x.id === key);
+    if (!a) return;
+    const before = kind === 'dadd' ? `${a.cat}/${a.n}` : '';
+    a[field] = ['price', 'regular', 'p'].includes(field) ? toNum(v) : String(v).trim();   // 値段は空なら null（受け口の版 2026-11-04c は、足した商品の値段が整数でないと保存しない）
+    if (kind === 'dadd' && field === 'n') {   // 店内の品は「見出し/名前」で写真・出さないを持つので、名前を変えたら付け替える
+      const after = `${a.cat}/${a.n}`;
+      if (draft.dine?.[before]) { draft.dine[after] = draft.dine[before]; delete draft.dine[before]; }
+      if (draft.photos?.['dine:' + before]) { draft.photos['dine:' + after] = draft.photos['dine:' + before]; delete draft.photos['dine:' + before]; }
+    }
+    if (field === 'regular' && a.regular == null) delete a.regular;   // レギュラーは無くてもよい（無ければミニと同じ値段）
+    return setMenu(listKey, list);
   }
   if (kind === 'notice') {
     const n = { ...(draft.notice || {}), [field]: String(v).trim() };
@@ -698,6 +940,7 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', e => {
   if (e.target.id === 'textOnly') { textOnly = e.target.checked; return render(); }
+  if (e.target.dataset.photo) return choosePhoto(e.target);   // 写真のタブ：写真を選んだ
   if (!e.target.dataset.f || !server) return;
   take(e.target);
   if (e.target.dataset.f.startsWith('text:')) {   // 文章のタブは、書いている場所が動かないように描き直さない
@@ -725,6 +968,8 @@ document.addEventListener('click', e => {
   if (b.dataset.act === 'see-text') { const r = APP_TEXTS[Number(b.dataset.i)]; return openSee(SEE_AT[r.at] || 'home', draft.texts?.[r.t]?.to || r.t); }
   if (b.dataset.act === 'text-mode') { textMode = b.dataset.mode; return render(); }
   if (b.dataset.act?.startsWith('ed-')) return edAct(b);
+  if (b.dataset.act === 'photo-reset') { setOv('photos', b.dataset.slot, 'id', undefined); delete photoErr[b.dataset.slot]; return render(); }   // 写真をもとに戻す（ドライブの写真は消さない）
+  if (menuAct(b)) return render();
   if (b.dataset.act === 'frame-reset' && draft.texts) {   // 一覧の「枠ごと」の文を元に戻す
     delete draft.texts[b.dataset.k];
     if (!Object.keys(draft.texts).length) delete draft.texts;
@@ -777,6 +1022,10 @@ $('#saveBtn').onclick = async () => {
   if (!dirty() || busy) return;
   // お知らせの見出しが空のものは、公式アプリに出ないので、保存する前に知らせる
   if (draft.news?.some(n => !n.title.trim())) { tab = 'news'; render(); return alert('見出しが空のお知らせがあります。見出しを入れるか、削除してください。'); }
+  if (draft.menu?.added?.some(a => !a.name.trim())) { tab = 'items'; render(); return alert('名前が空の、足した商品があります。名前を入れるか、削除してください。'); }
+  if (draft.menu?.dineAdded?.some(a => !a.n.trim())) { tab = 'dine'; render(); return alert('名前が空の、足した店内の品があります。名前を入れるか、削除してください。'); }
+  if (draft.menu?.added?.some(a => a.price == null)) { tab = 'items'; render(); return alert('値段が入っていない、足した商品があります。値段を入れてください（無料なら 0）。'); }
+  if (draft.menu?.dineAdded?.some(a => a.p == null)) { tab = 'dine'; render(); return alert('値段が入っていない、足した店内の品があります。値段を入れてください（無料なら 0）。'); }
   busy = true; drawBar();
   try {
     const r = await post({ action: 'saveAppContent', pin, content: draft, expect: server.v });
