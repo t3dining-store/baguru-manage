@@ -230,7 +230,7 @@ function newsHtml() {
   const list = newsList();
   return `<section class="m-sec">
       <h2>お知らせ</h2>
-      <p class="m-hint">公式アプリのホームの「お知らせ」に、上から順に出ます。${draft.news ? '' : '今は data.js のままです。'}</p>
+      <p class="m-hint">公式アプリのホームの「お知らせ」に、上から順に出ます。タイトルは日付の下に1行で出ます（長いと字が小さくなり、それでも入らない分は「…」になります。スマホで25字くらいまで）。${draft.news ? '' : '今は data.js のままです。'}</p>
       <button class="m-btn m-sub" data-act="news-add">＋ お知らせを足す（いちばん上に）</button>
       ${list.map((n, i) => `<div class="m-news">
           <div class="m-news-top"><input type="date" data-f="news:date:${i}" value="${esc(n.date)}" aria-label="日付">
@@ -325,23 +325,23 @@ function textRow(r) {
 }
 
 /** 画面で枠ごと直した文（数字などが入る文。{1} などは ◯ で見せる）。ここでは元に戻すだけ。直すのは「画面で直す」で */
-const frameKeys = () => Object.keys(draft.texts || {}).filter(k => draft.texts[k].x === 1);
+const frameKeys = () => Object.keys(draft.texts || {}).filter(k => draft.texts[k].x === 1 || !APP_KEYS.has(k));   // 枠ごとの形と、一覧に無い文をまるごと直したもの
 function frameRow(k) {
   const show = t => esc(t.replace(/\{\d+\}/g, '◯'));
   return `<div class="m-text is-edited">
-      <div class="m-text-top"><small>枠ごと・元の文：${show(k)}</small><button class="m-ed-undo" data-act="frame-reset" data-k="${esc(k)}">元の文に戻す</button></div>
+      <div class="m-text-top"><small>${draft.texts[k].x === 1 ? '枠ごと' : 'まるごと'}・元の文：${show(k)}</small><button class="m-ed-undo" data-act="frame-reset" data-k="${esc(k)}">元の文に戻す</button></div>
       <p class="m-frame-to">${show(draft.texts[k].to)}</p>
     </div>`;
 }
 function textListHtml() {
   const q = textQuery.trim(), hits = (q || textOnly) && APP_TEXTS.filter(r => (!q || r.t.includes(q) || draft.texts?.[r.t]?.to.includes(q)) && (!textOnly || draft.texts?.[r.t]));
   const frames = frameKeys().filter(k => !q || k.includes(q) || draft.texts[k].to.includes(q));
-  const fnote = '<p class="m-hint">「枠ごと」は、画面で直す で、数字などが入る文をまるごと直したものです。◯ には、数字など、その時の字が入ります。直すのは「画面で直す」でしてください。</p>';
+  const fnote = '<p class="m-hint">「枠ごと」は、画面で直す で、数字などが入る文をまるごと直したものです。◯ には、数字など、その時の字が入ります。「まるごと」は、この一覧に無い文を、画面で直す でまるごと直したものです。直すのは「画面で直す」でしてください。</p>';
   if (hits) {
     return `<p class="m-hint">${hits.length + frames.length}件${hits.length > 60 ? '（はじめの60件を出しています。言葉をしぼってください）' : ''}</p>${frames.length ? fnote + frames.map(frameRow).join('') : ''}${hits.slice(0, 60).map(textRow).join('')}`;
   }
   const all = frameKeys();
-  return (all.length ? `<button class="m-group ${textOpen.has('*frames') ? 'on' : ''}" data-act="text-group" data-at="*frames"><b>画面で枠ごと直した文</b><small>${all.length}件</small></button>
+  return (all.length ? `<button class="m-group ${textOpen.has('*frames') ? 'on' : ''}" data-act="text-group" data-at="*frames"><b>画面で枠ごと・まるごと直した文</b><small>${all.length}件</small></button>
       ${textOpen.has('*frames') ? fnote + all.map(frameRow).join('') : ''}` : '') + textAts.map(at => {
     const rows = textRows(at), n = rows.filter(r => draft.texts?.[r.t]).length;
     return `<button class="m-group ${textOpen.has(at) ? 'on' : ''}" data-act="text-group" data-at="${esc(at)}"><b>${esc(at)}</b><small>${rows.length}件${n ? `・${n}件直しました` : ''}</small></button>
@@ -380,14 +380,16 @@ const editUrl = route => seeUrl(route).replace('preview#', 'preview&edit#');
 const edPost = msg => ed?.frame?.contentWindow?.postMessage({ type: 'baguru-manage', ...msg }, location.origin);
 const notTexts = () => canon({ ...draft, texts: undefined });
 const oneLine = t => String(t).replace(/\s+/g, ' ').trim();
-const edKey = c => ({ key: c?.key || '', s: c?.s || 0, x: c?.x || 0 });
+const edKey = c => (c?.news ? { key: '', s: 0, x: 0, news: { i: c.ai, f: c.f } } : { key: c?.key || '', s: c?.s || 0, x: c?.x || 0 });
 
 /* 枠ごとまるごと直す（2026-11-04 ko-dai さんの指示：「文章がすごく分割されてしまうので、アプリで表示されている枠を選択して、その枠内を全て編集できるように。改行の場所もアプリと全く同じに」）
  *  ・押した字のかたまり（点線の枠）が、文章の一覧の文と同じなら、その文を直す（今までと同じ）
  *  ・数字などが間に入る文は、枠ごとの形（js/texts.js の APP_FRAMES。'配達は{1}食以上…'）で直す。{1} などは「変わる字」として、直す欄では色を付けて出し、
  *    打てないようにする（消すことはできる）。保存は texts の { to, x: 1 }。公式アプリが {1} などに、画面のその時の字を入れて出す（content.js の tplText）
  *  ・直す欄は、アプリの枠と同じ幅・同じ字の形・同じ字の大きさにする（中のアプリが edStyle で知らせる）。だから改行の場所がアプリと同じになる
- *  ・どちらにも合わない字（字をつないで作る文など）は、前と同じく、文の一部ごとに選んで直す */
+ *  ・どちらにも合わない字（一覧に無い文。data.js の長い説明など）も、点線の枠の文なら、字のかたまり全体をそのまま1つの文として直す（2026-11-04 ko-dai さんの指示：「まだ分割されている部分があるので、文章全体を」）。
+ *    ★字のかたまり全体が同じときだけ置きかわる（s: 0）。点線の無い字（値段・数字・お客様が入れた字）は直さない
+ *  ・お知らせのタイトルと本文は、お知らせのタブと同じもの（draft.news）を直す（文章の置きかえにはしない）。打つたびに、中のアプリへ中身ごと送って描き直す */
 const APP_KEYS = new Map(APP_TEXTS.map((r, i) => [r.t, i]));
 const FRAMES = APP_FRAMES.map(f => ({ ...f, ...tplRe(f.t), lit: f.t.replace(/\{\d+\}/g, '').length }));
 /** 枠ごとの形の一覧（js/texts.js のものと、前に直したけれど今の一覧に無いもの） */
@@ -412,8 +414,10 @@ function edPartial(t) {
   if (!m.size) return t;
   return t.replace(new RegExp([...m.keys()].sort((a, b) => b.length - a.length).map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g'), x => m.get(x));
 }
+/** 中のアプリのお知らせの番号 → newsList の番号（日付かタイトルの無いものは、アプリに出ないので数えない。content.js の applyContent と同じ） */
+const newsAt = ai => newsList().map((n, k) => [n, k]).filter(([n]) => /^\d{4}-\d{2}-\d{2}$/.test(n.date) && String(n.title || '').trim())[ai]?.[1];
 /** 直す文の、今の字（{1} などはそのまま） */
-const edNow = c => draft.texts?.[c.key]?.to ?? (c.x ? edPartial(c.key) : c.key);
+const edNow = c => (c.news ? String(newsList()[c.i]?.[c.f] ?? '') : draft.texts?.[c.key]?.to ?? (c.x ? edPartial(c.key) : c.key));
 /** 画面に出る形（{1} などに、押した所の字を入れる） */
 const edShow = c => edNow(c).replace(/\{(\d+)\}/g, (m, n) => c.vals?.[n] ?? '◯');
 
@@ -461,7 +465,9 @@ function edSend() {
 
 /** 直す欄の上（どこの文か・元の文・元の文に戻す）。打っているあいだは、ここだけ描き直す */
 function edHeadHtml() {
-  const c = ed.cur, edited = !!draft.texts?.[c.key], show = t => esc(t.replace(/\{(\d+)\}/g, (m, n) => c.vals?.[n] ?? '◯'));
+  const c = ed.cur;
+  if (c.news) return `<div class="m-text-top"><small>お知らせの${c.f === 'title' ? 'タイトル' : '本文'}（「お知らせ」のタブと同じものを直します）</small></div>`;
+  const edited = !!draft.texts?.[c.key], show = t => esc(t.replace(/\{(\d+)\}/g, (m, n) => c.vals?.[n] ?? '◯'));
   return `<div class="m-text-top"><small>${esc(c.at)}${c.x ? '・枠ごと' : ''}${edited ? `<br>元の文：${show(c.key)}` : ''}</small>${edited ? '<button class="m-ed-undo" data-act="ed-undo">元の文に戻す</button>' : ''}</div>`;
 }
 function edPanelHtml() {
@@ -476,10 +482,10 @@ function edPanelHtml() {
   const c = ed.cur;
   // 直す欄。{1} などは、色を付けた打てない字（m-chip）にする。字の形と幅は、あとで edMirror がアプリの枠に合わせる
   const body = edNow(c).split(/\{(\d+)\}/).map((p, i) => (i % 2 ? (c.vals?.[p] !== undefined ? `<span class="m-chip" contenteditable="false" data-k="${p}">${esc(c.vals[p])}</span>` : '') : esc(p))).join('');
-  return `<div class="m-text ${draft.texts?.[c.key] ? 'is-edited' : ''}">
+  return `<div class="m-text ${!c.news && draft.texts?.[c.key] ? 'is-edited' : ''}">
       <div id="edHead">${edHeadHtml()}</div>
       <div class="m-ed-wrap"><div id="edMirror" class="m-ed-mirror ${c.st ? 'is-same' : ''}" role="textbox" aria-multiline="true" aria-label="直した文">${body}</div></div>
-      <p class="m-hint">${c.st ? 'この欄は、アプリの枠と同じ幅・同じ字の大きさです。改行の場所も、アプリと同じになります。' : ''}打ったそばから、上の画面の字が変わります。改行すると、アプリでも改行されます。全部消すと元の文に戻ります。${c.x ? '<br>色の付いた字（数字など）は、お店の設定やお客様ごとに変わる字です。打ち直せません（消すことはできます）。' : ''}</p>
+      <p class="m-hint">${c.st ? 'この欄は、アプリの枠と同じ幅・同じ字の大きさです。改行の場所も、アプリと同じになります。' : ''}打ったそばから、上の画面の字が変わります。${c.news && c.f === 'title' ? 'タイトルは1行で出ます（長いと字が小さくなります）。' : '改行すると、アプリでも改行されます。'}${c.news ? '' : '全部消すと元の文に戻ります。'}${c.x ? '<br>色の付いた字（数字など）は、お店の設定やお客様ごとに変わる字です。打ち直せません（消すことはできます）。' : ''}</p>
     </div>`;
 }
 /** 直す欄を、アプリの枠と同じ幅・同じ字の形にする（値は CSSOM で入れるので、変な値は入らない） */
@@ -518,6 +524,15 @@ function edSerial(el) {
 function edTyped(el) {
   const c = ed?.cur;
   if (!c || !server) return;
+  if (c.news) {   // お知らせ：お知らせのタブと同じく draft.news に写し、中のアプリへ中身ごと送る
+    const list = newsList().map(n => ({ ...n })), v = edSerial(el).replace(/\n+$/, '');
+    list[c.i] = { ...list[c.i], [c.f]: c.f === 'title' ? v.replace(/\s*\n\s*/g, ' ') : v };
+    draft.news = list;
+    drawBar();
+    editStore();
+    ed.base = notTexts();   // 文章のタブに戻ったときに、中のアプリを開き直さないように
+    return edPost({ kind: 'content', content: draft });
+  }
   const to = edSerial(el).replace(/\n+$/, '').trim();
   draft.texts ??= {};
   if (!to || to === c.key) delete draft.texts[c.key]; else draft.texts[c.key] = c.x ? { to, x: 1 } : { to, s: c.s };
@@ -546,8 +561,16 @@ function edRows(list) {
 function edOnPick(d) {
   const items = v => (Array.isArray(v) ? v.filter(x => x && typeof x.t === 'string' && x.t.length <= 2000).slice(0, 20) : []);
   const strs = v => (Array.isArray(v) ? v.filter(x => typeof x === 'string' && x.length <= 2000).slice(0, 20) : []);
-  const pick = list => list.flatMap(it => { const c = edCand(it); return c ? [c] : edPartCands(it.t); });
-  const main = items(d.main);
+  // 一覧の文 → 枠ごとの形 → どちらにも合わない点線の文は、字のかたまり全体を1つの文として（前は、文の一部ごとに分かれて出ていた）
+  const whole = it => (it.mark && String(it.t).trim() ? [{ key: String(it.t).trim(), s: 0, x: 0, at: '画面の文（まるごと）', st: it.st && typeof it.st === 'object' ? it.st : null }] : edPartCands(it.t));
+  const pick = list => list.flatMap(it => { const c = edCand(it); return c ? [c] : whole(it); });
+  const main = items(d.main), nw = d.news, k = nw && Number.isInteger(nw.i) ? newsAt(nw.i) : undefined;
+  if (k !== undefined && (nw.f === 'title' || nw.f === 'body')) {   // お知らせのタイトル・本文
+    ed.cands = [{ news: true, ai: nw.i, i: k, f: nw.f, key: `news:${k}:${nw.f}`, at: 'お知らせ', st: nw.st && typeof nw.st === 'object' ? nw.st : null }];
+    ed.cur = ed.cands[0];
+    edPanel();
+    return edPost({ kind: 'pick', ...edKey(ed.cur) });
+  }
   let cands = pick(main);
   if (!cands.length) cands = pick(items(d.more));   // 字のない所（枠の余白など）を押したときは、まわりの字から
   cands.push(...edRows(strs(d.attrs)).map(i => ({ key: APP_TEXTS[i].t, s: APP_TEXTS[i].s, x: 0, at: APP_TEXTS[i].at, st: null })));
@@ -648,6 +671,8 @@ function take(el) {
   }
 }
 
+// お知らせのタイトルは1行なので、直す欄で改行させない
+document.addEventListener('keydown', e => { if (e.target.id === 'edMirror' && e.key === 'Enter' && ed?.cur?.news && ed.cur.f === 'title') e.preventDefault(); });
 document.addEventListener('input', e => {
   if (e.target.id === 'edMirror') return edTyped(e.target);   // 画面で直す：枠ごとの直す欄
   if (e.target.id === 'textSearch') { textQuery = e.target.value; $('#textList').innerHTML = textListHtml(); return; }   // 探す欄から指が離れないように、一覧だけ描き直す
