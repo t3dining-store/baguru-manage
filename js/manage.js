@@ -185,12 +185,7 @@ const APP_ORIGIN = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? locati
 const freshUrl = u => u.replace('#', `&r=${Date.now().toString(36)}#`);
 let seeFocus = '';   // 「アプリで見る」で、確かめている文
 function openSee(route, focus = '') {
-  seeFocus = focus;
-  // 引っ越しの日までは、前の渡し方（同じ場所の sessionStorage）も残す。場所が分かれたら、下の postMessage（hello への返事）だけで渡る
-  try {
-    sessionStorage.setItem('bg.preview', JSON.stringify(draft));
-    sessionStorage.setItem('bg.previewFocus', focus);
-  } catch (e) { /* postMessage で渡すので、そのまま開く */ }
+  seeFocus = focus;   // 直しと文は、中のアプリの hello への返事（postMessage）で渡る（前の sessionStorage の渡し方は、引っ越しの日 2026-11-05 に外した）
   let box = $('#see');
   if (!box) {
     box = Object.assign(document.createElement('div'), { id: 'see', className: 'm-see-box' });
@@ -560,7 +555,7 @@ function textsHtml() {
 
 /* ---- 文章の「画面で直す」（2026-11-03 ko-dai さんの指示：ホームページの管理画面のように、実際の画面を直しているような感じで文章を直す） ----
  *  本物の公式アプリを中に開き（?preview&edit。公式アプリの js/content.js の TEXT_EDIT）、点線の文を押すと、下の欄で直せる。打ったそばから画面に出る。
- *  保存は上の「保存」（ほかのタブと同じ）。お客様には、保存するまで見えない（「アプリで見る」と同じく、直しは sessionStorage の bg.preview で渡す）。
+ *  保存は上の「保存」（ほかのタブと同じ）。お客様には、保存するまで見えない（「アプリで見る」と同じく、直しは postMessage で渡す）。
  *  中のアプリは、描き直しのたびに読み直さないよう、#view の外（#edit）に1回だけ作る。やりとりは同じ場所のページとだけ（postMessage） */
 let textMode = 'screen';
 let ed = null;      // { frame, route, on（文を押して直す）, cur（直している文。edCand の形。無ければ null）, cands（押した所の文。押す前は null）, base }
@@ -613,21 +608,17 @@ const edNow = c => (c.news ? String(newsList()[c.i]?.[c.f] ?? '') : draft.texts?
 /** 画面に出る形（{1} などに、押した所の字を入れる） */
 const edShow = c => edNow(c).replace(/\{(\d+)\}/g, (m, n) => c.vals?.[n] ?? '◯');
 
-function editStore() {
-  try { sessionStorage.setItem('bg.preview', JSON.stringify(draft)); sessionStorage.setItem('bg.previewFocus', ''); } catch (e) { /* 出せないだけ */ }
-}
 /** 文章のタブで「画面で直す」のときだけ出す。ほかのタブで直した分（値段など）があれば、入れて開き直す */
 function editShow() {
   const box = $('#edit'), on = !!server && tab === 'texts' && textMode === 'screen';
   box.hidden = !on;
   if (!on) return;
   if (!ed) editBuild(box);
-  else if (ed.base !== notTexts()) { ed.base = notTexts(); editStore(); ed.frame.src = freshUrl(editUrl(ed.route)); }   // 開き直すと、hello への返事で今の直しが渡る
+  else if (ed.base !== notTexts()) { ed.base = notTexts(); ed.frame.src = freshUrl(editUrl(ed.route)); }   // 開き直すと、hello への返事で今の直しが渡る
   else edSend();
   editFit();
 }
 function editBuild(box) {
-  editStore();
   ed = { route: 'home', on: true, cur: null, cands: null, base: notTexts(), frame: null };
   box.innerHTML = `
     <nav class="m-ed-tabs" aria-label="画面">${SEE_SCREENS.map(([k, n]) => `<button data-act="ed-go" data-route="${k}" class="${k === ed.route ? 'on' : ''}">${n}</button>`).join('')}</nav>
@@ -648,10 +639,9 @@ function editFit() {
 }
 addEventListener('resize', editFit);
 
-/** 直した文を、中のアプリに送る（開き直したときのために sessionStorage にも置く） */
+/** 直した文を、中のアプリに送る（開き直したときは、hello への返事で今の直しが渡る） */
 function edSend() {
   if (!ed) return;
-  editStore();
   edPost({ kind: 'texts', texts: draft.texts || {} });
 }
 
@@ -726,7 +716,6 @@ function edTyped(el) {
     list[c.i] = { ...list[c.i], [c.f]: c.f === 'title' ? v.replace(/\s*\n\s*/g, ' ') : v };
     draft.news = list;
     drawBar();
-    editStore();
     ed.base = notTexts();   // 文章のタブに戻ったときに、中のアプリを開き直さないように
     return edPost({ kind: 'content', content: draft });
   }
