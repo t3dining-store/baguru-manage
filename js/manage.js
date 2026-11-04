@@ -179,11 +179,18 @@ const seeUrl = route => (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)
   ? `../index.html?${/[?&]test\b/.test(location.search) ? 'test&' : ''}preview#${route}`
   : `${SHOP.appUrl}index.html?preview#${route}`);
 
+// 中に開く公式アプリの場所（名指しで確かめる。2026-11-05 お店用アプリの引っ越しの段階1：マネージと公式アプリの場所が分かれても動くように）。この Mac では同じ場所
+const APP_ORIGIN = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? location.origin : new URL(SHOP.appUrl).origin;
+// 枠に開き直すアドレス（場所が分かれると contentWindow.location.reload() が使えないので、src を入れ直す。同じアドレスだと開き直さないので印を付ける）
+const freshUrl = u => u.replace('#', `&r=${Date.now().toString(36)}#`);
+let seeFocus = '';   // 「アプリで見る」で、確かめている文
 function openSee(route, focus = '') {
+  seeFocus = focus;
+  // 引っ越しの日までは、前の渡し方（同じ場所の sessionStorage）も残す。場所が分かれたら、下の postMessage（hello への返事）だけで渡る
   try {
     sessionStorage.setItem('bg.preview', JSON.stringify(draft));
     sessionStorage.setItem('bg.previewFocus', focus);
-  } catch (e) { return alert('この端末では、見え方を出せませんでした。'); }
+  } catch (e) { /* postMessage で渡すので、そのまま開く */ }
   let box = $('#see');
   if (!box) {
     box = Object.assign(document.createElement('div'), { id: 'see', className: 'm-see-box' });
@@ -196,9 +203,17 @@ function openSee(route, focus = '') {
   document.body.classList.add('is-seeing');
 }
 const closeSee = () => { $('#see')?.remove(); document.body.classList.remove('is-seeing'); };
-// 確かめている文が、開いた画面に無かったとき（商品を選ぶ画面など、押して開く所にある文）
+// 中の公式アプリからの知らせ（公式アプリの場所からだけ受ける）
 window.addEventListener('message', e => {
-  if (e.origin !== location.origin || e.data?.type !== 'baguru-preview' || e.data.found) return;
+  if (e.origin !== APP_ORIGIN || e.data?.type !== 'baguru-preview') return;
+  const seeFrame = $('#see iframe');
+  if (e.data.kind === 'hello') {   // 開いた：保存前の直しと、確かめている文を渡す（「画面で直す」の枠には、文はいらない）
+    const isSee = seeFrame && e.source === seeFrame.contentWindow, isEd = ed?.frame && e.source === ed.frame.contentWindow;
+    if (isSee || isEd) e.source.postMessage({ type: 'baguru-manage', kind: 'preview', content: draft, focus: isSee ? seeFocus : '' }, APP_ORIGIN);
+    return;
+  }
+  // 確かめている文が、開いた画面に無かったとき（商品を選ぶ画面など、押して開く所にある文）
+  if (e.data.kind !== 'focus' || e.data.found || !seeFrame || e.source !== seeFrame.contentWindow) return;
   const n = $('#seeNote');
   if (n) n.textContent = 'この文は、今の画面には出ていません。下の画面を押して開くか、上で画面を切りかえて探してください。';
 });
@@ -551,7 +566,7 @@ let textMode = 'screen';
 let ed = null;      // { frame, route, on（文を押して直す）, cur（直している文。edCand の形。無ければ null）, cands（押した所の文。押す前は null）, base }
 const ED_W = 390;   // 中のアプリの幅（スマホと同じ幅にして、改行の位置をそろえる）
 const editUrl = route => seeUrl(route).replace('preview#', 'preview&edit#');
-const edPost = msg => ed?.frame?.contentWindow?.postMessage({ type: 'baguru-manage', ...msg }, location.origin);
+const edPost = msg => ed?.frame?.contentWindow?.postMessage({ type: 'baguru-manage', ...msg }, APP_ORIGIN);   // 公式アプリの場所だけに送る
 const notTexts = () => canon({ ...draft, texts: undefined });
 const oneLine = t => String(t).replace(/\s+/g, ' ').trim();
 const edKey = c => (c?.news ? { key: '', s: 0, x: 0, news: { i: c.ai, f: c.f } } : { key: c?.key || '', s: c?.s || 0, x: c?.x || 0 });
@@ -607,7 +622,7 @@ function editShow() {
   box.hidden = !on;
   if (!on) return;
   if (!ed) editBuild(box);
-  else if (ed.base !== notTexts()) { ed.base = notTexts(); editStore(); ed.frame.contentWindow?.location.reload(); }
+  else if (ed.base !== notTexts()) { ed.base = notTexts(); editStore(); ed.frame.src = freshUrl(editUrl(ed.route)); }   // 開き直すと、hello への返事で今の直しが渡る
   else edSend();
   editFit();
 }
@@ -790,7 +805,7 @@ function edAct(b) {
   }
 }
 addEventListener('message', e => {
-  if (!ed || e.source !== ed.frame?.contentWindow || e.origin !== location.origin) return;
+  if (!ed || e.source !== ed.frame?.contentWindow || e.origin !== APP_ORIGIN) return;
   const d = e.data || {};
   if (d.type !== 'baguru-edit') return;
   if (d.kind === 'ready') {   // 中のアプリが開いた（開き直した）とき：直せる文の一覧・押したときの動き・直した文・直している文を渡す
