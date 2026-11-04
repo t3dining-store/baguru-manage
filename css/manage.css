@@ -154,6 +154,7 @@ body.is-seeing { overflow: hidden; }
 .m-ed-mirror:focus { border-style: solid; box-shadow: 0 0 0 3px var(--ember-soft); }
 /* 変わる字（数字など）。幅が変わらないよう、余白も線も付けない */
 .m-chip { background: #f6dcd3; border-radius: 3px; color: var(--ember); }
+.m-ed-warn { margin: 6px 0 0; padding: 6px 10px; border-radius: 8px; background: var(--ember-soft); color: var(--ember); font-size: 12.5px; font-weight: 700; }
 .m-frame-to { margin: 4px 0 0; white-space: pre-wrap; font-size: 14px; line-height: 1.5; }
 .m-ed-undo { flex: none; height: 30px; padding: 0 11px; border-radius: 999px; border: 1.5px solid var(--line); background: #fff; font-size: 12px; font-weight: 700; color: var(--ember); white-space: nowrap; }
 

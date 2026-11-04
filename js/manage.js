@@ -329,7 +329,7 @@ const frameKeys = () => Object.keys(draft.texts || {}).filter(k => draft.texts[k
 function frameRow(k) {
   const show = t => esc(t.replace(/\{\d+\}/g, '◯'));
   return `<div class="m-text is-edited">
-      <div class="m-text-top"><small>${draft.texts[k].x === 1 ? '枠ごと' : 'まるごと'}・元の文：${show(k)}</small><button class="m-ed-undo" data-act="frame-reset" data-k="${esc(k)}">元の文に戻す</button></div>
+      <div class="m-text-top"><small>${draft.texts[k].x === 1 ? '枠ごと' : draft.texts[k].x === 2 ? '飾りの字ごと' : 'まるごと'}・元の文：${show(k)}</small><button class="m-ed-undo" data-act="frame-reset" data-k="${esc(k)}">元の文に戻す</button></div>
       <p class="m-frame-to">${show(draft.texts[k].to)}</p>
     </div>`;
 }
@@ -381,6 +381,7 @@ const edPost = msg => ed?.frame?.contentWindow?.postMessage({ type: 'baguru-mana
 const notTexts = () => canon({ ...draft, texts: undefined });
 const oneLine = t => String(t).replace(/\s+/g, ' ').trim();
 const edKey = c => (c?.news ? { key: '', s: 0, x: 0, news: { i: c.ai, f: c.f } } : { key: c?.key || '', s: c?.s || 0, x: c?.x || 0 });
+const tokens = t => [...String(t).matchAll(/\{(\d+)\}/g)].map(m => m[1]).join(',');
 
 /* 枠ごとまるごと直す（2026-11-04 ko-dai さんの指示：「文章がすごく分割されてしまうので、アプリで表示されている枠を選択して、その枠内を全て編集できるように。改行の場所もアプリと全く同じに」）
  *  ・押した字のかたまり（点線の枠）が、文章の一覧の文と同じなら、その文を直す（今までと同じ）
@@ -389,7 +390,9 @@ const edKey = c => (c?.news ? { key: '', s: 0, x: 0, news: { i: c.ai, f: c.f } }
  *  ・直す欄は、アプリの枠と同じ幅・同じ字の形・同じ字の大きさにする（中のアプリが edStyle で知らせる）。だから改行の場所がアプリと同じになる
  *  ・どちらにも合わない字（一覧に無い文。data.js の長い説明など）も、点線の枠の文なら、字のかたまり全体をそのまま1つの文として直す（2026-11-04 ko-dai さんの指示：「まだ分割されている部分があるので、文章全体を」）。
  *    ★字のかたまり全体が同じときだけ置きかわる（s: 0）。点線の無い字（値段・数字・お客様が入れた字）は直さない
- *  ・お知らせのタイトルと本文は、お知らせのタブと同じもの（draft.news）を直す（文章の置きかえにはしない）。打つたびに、中のアプリへ中身ごと送って描き直す */
+ *  ・お知らせのタイトルと本文は、お知らせのタブと同じもの（draft.news）を直す（文章の置きかえにはしない）。打つたびに、中のアプリへ中身ごと送って描き直す
+ *  ・文の途中に飾りの字（太字・色の字など）が入る文は、飾りを {1} などの打てない字にして、文全体を1つの欄で直す（x: 2。content.js の runSig・runMark）。
+ *    飾りは消せない（消したり順を入れかえたりすると、保存せずに知らせる）。地の字に数字がある文（お客様ごとに変わる）は、前のとおり分けて直す */
 const APP_KEYS = new Map(APP_TEXTS.map((r, i) => [r.t, i]));
 const FRAMES = APP_FRAMES.map(f => ({ ...f, ...tplRe(f.t), lit: f.t.replace(/\{\d+\}/g, '').length }));
 /** 枠ごとの形の一覧（js/texts.js のものと、前に直したけれど今の一覧に無いもの） */
@@ -468,13 +471,13 @@ function edHeadHtml() {
   const c = ed.cur;
   if (c.news) return `<div class="m-text-top"><small>お知らせの${c.f === 'title' ? 'タイトル' : '本文'}（「お知らせ」のタブと同じものを直します）</small></div>`;
   const edited = !!draft.texts?.[c.key], show = t => esc(t.replace(/\{(\d+)\}/g, (m, n) => c.vals?.[n] ?? '◯'));
-  return `<div class="m-text-top"><small>${esc(c.at)}${c.x ? '・枠ごと' : ''}${edited ? `<br>元の文：${show(c.key)}` : ''}</small>${edited ? '<button class="m-ed-undo" data-act="ed-undo">元の文に戻す</button>' : ''}</div>`;
+  return `<div class="m-text-top"><small>${esc(c.at)}${c.x === 1 ? '・枠ごと' : c.x === 2 ? '・飾りの字ごと' : ''}${edited ? `<br>元の文：${show(c.key)}` : ''}</small>${edited ? '<button class="m-ed-undo" data-act="ed-undo">元の文に戻す</button>' : ''}</div>`;
 }
 function edPanelHtml() {
   if (!ed || !ed.cur) {
     if (ed?.cands?.length) {
       return `<p class="m-ed-q">ここには、直せる文が${ed.cands.length}つあります。どれを直しますか？</p>
-        ${ed.cands.map((c, i) => `<button class="m-ed-cand" data-act="ed-cand" data-i="${i}"><b>${esc(oneLine(edShow(c)))}</b><small>${esc(c.at)}${c.x ? '・枠ごと' : ''}</small></button>`).join('')}`;
+        ${ed.cands.map((c, i) => `<button class="m-ed-cand" data-act="ed-cand" data-i="${i}"><b>${esc(oneLine(edShow(c)))}</b><small>${esc(c.at)}${c.x === 1 ? '・枠ごと' : c.x === 2 ? '・文全体' : c.only ? '・その字だけ' : ''}</small></button>`).join('')}`;
     }
     if (ed?.cands) return '<p class="m-ed-q">この字は、ここでは直せません。</p><p class="m-hint">値段・売り切れ・お知らせ・一言・特典の中身は、それぞれのタブで直します。数字や、お客様が入れた字は直せません。</p>';
     return '<p class="m-ed-q">上の画面で、直したい文（点線で囲んだ文）を押してください。</p>';
@@ -485,7 +488,7 @@ function edPanelHtml() {
   return `<div class="m-text ${!c.news && draft.texts?.[c.key] ? 'is-edited' : ''}">
       <div id="edHead">${edHeadHtml()}</div>
       <div class="m-ed-wrap"><div id="edMirror" class="m-ed-mirror ${c.st ? 'is-same' : ''}" role="textbox" aria-multiline="true" aria-label="直した文">${body}</div></div>
-      <p class="m-hint">${c.st ? 'この欄は、アプリの枠と同じ幅・同じ字の大きさです。改行の場所も、アプリと同じになります。' : ''}打ったそばから、上の画面の字が変わります。${c.news && c.f === 'title' ? 'タイトルは1行で出ます（長いと字が小さくなります）。' : '改行すると、アプリでも改行されます。'}${c.news ? '' : '全部消すと元の文に戻ります。'}${c.x ? '<br>色の付いた字（数字など）は、お店の設定やお客様ごとに変わる字です。打ち直せません（消すことはできます）。' : ''}</p>
+      <p class="m-hint">${c.st ? 'この欄は、アプリの枠と同じ幅・同じ字の大きさです。改行の場所も、アプリと同じになります。' : ''}打ったそばから、上の画面の字が変わります。${c.news && c.f === 'title' ? 'タイトルは1行で出ます（長いと字が小さくなります）。' : '改行すると、アプリでも改行されます。'}${c.news ? '' : '全部消すと元の文に戻ります。'}${c.x === 1 ? '<br>色の付いた字（数字など）は、お店の設定やお客様ごとに変わる字です。打ち直せません（消すことはできます）。' : c.x === 2 ? '<br>色の付いた字は、アプリで太字などになっている字です。ここでは打ち直せず、消すこともできません（その字だけを直すときは、上の画面でその字を押して「その字だけ」を選びます）。' : ''}</p>
     </div>`;
 }
 /** 直す欄を、アプリの枠と同じ幅・同じ字の形にする（値は CSSOM で入れるので、変な値は入らない） */
@@ -494,6 +497,11 @@ function edMirror() {
   if (!el) return;
   el.contentEditable = 'plaintext-only';
   if (el.contentEditable !== 'plaintext-only') el.contentEditable = 'true';   // 古いブラウザ
+  // 飾りの字（x: 2）は、アプリと同じ字の形・大きさ・すき間にする（幅がそろわないと、改行の場所がずれる）
+  if (ed.cur?.cst) $$('.m-chip', el).forEach(ch => {
+    const cs = ed.cur.cst[ch.dataset.k];
+    if (cs && typeof cs === 'object') for (const [k, v] of Object.entries(cs)) if (typeof v === 'string' && v.length < 300 && k in ch.style) ch.style[k] = v;
+  });
   const st = ed.cur?.st;
   if (!st) return;
   const w = Number(st.w), ind = Number(st.indent), max = Number(st.max);
@@ -534,8 +542,12 @@ function edTyped(el) {
     return edPost({ kind: 'content', content: draft });
   }
   const to = edSerial(el).replace(/\n+$/, '').trim();
+  if (c.x === 2 && to && tokens(to) !== tokens(c.key)) {   // 飾りを消した・順を変えた：保存しない
+    $('#edHead').innerHTML = edHeadHtml() + '<p class="m-ed-warn">色の付いた字（太字などの飾り）は消せません。打つ前に戻す（元に戻す操作）か、「元の文に戻す」を押してください。</p>';
+    return;
+  }
   draft.texts ??= {};
-  if (!to || to === c.key) delete draft.texts[c.key]; else draft.texts[c.key] = c.x ? { to, x: 1 } : { to, s: c.s };
+  if (!to || to === c.key) delete draft.texts[c.key]; else draft.texts[c.key] = c.x === 2 ? { to, x: 2 } : c.x ? { to, x: 1 } : { to, s: c.s };
   if (!Object.keys(draft.texts).length) delete draft.texts;
   el.closest('.m-text').classList.toggle('is-edited', !!draft.texts?.[c.key]);
   $('#edHead').innerHTML = edHeadHtml();
@@ -571,7 +583,9 @@ function edOnPick(d) {
     edPanel();
     return edPost({ kind: 'pick', ...edKey(ed.cur) });
   }
-  let cands = pick(main);
+  const run = d.run && typeof d.run.key === 'string' && d.run.key.length <= 800 && /\{\d+\}/.test(d.run.key) ? d.run : null;
+  let cands = run ? [{ key: run.key, s: 0, x: 2, at: '画面の文（まるごと）', vals: run.vals && typeof run.vals === 'object' ? run.vals : {}, cst: run.cst && typeof run.cst === 'object' ? run.cst : null, st: run.st && typeof run.st === 'object' ? run.st : null }] : pick(main);
+  if (run?.inner) cands.push(...pick(main).map(c => ({ ...c, only: true })));   // 太字などの字そのものを押したときは、その字だけも選べる
   if (!cands.length) cands = pick(items(d.more));   // 字のない所（枠の余白など）を押したときは、まわりの字から
   cands.push(...edRows(strs(d.attrs)).map(i => ({ key: APP_TEXTS[i].t, s: APP_TEXTS[i].s, x: 0, at: APP_TEXTS[i].at, st: null })));
   const seen = new Set();
