@@ -214,9 +214,10 @@ function loginHtml() {
 }
 
 const priceIn = (f, v, base, label = '') => `<label class="m-price">${label ? `<em>${esc(label)}</em>` : ''}<span>¥</span>
-    <input type="text" inputmode="numeric" data-f="${f}" value="${esc(v ?? base)}" aria-label="${esc(label || '値段')}">
+    <input type="text" inputmode="numeric" data-f="${esc(f)}" value="${esc(v ?? base)}" aria-label="${esc(label || '値段')}">
     ${v != null && v !== base ? `<small>もと ${yen(base)}</small>` : ''}</label>`;
-const flagIn = (f, on, label) => `<label class="m-flag ${on ? 'on' : ''}"><input type="checkbox" data-f="${f}" ${on ? 'checked' : ''}><span>${label}</span></label>`;
+// data-f には、足した店内の品の名前が入ることがあるので esc する（Codex の指摘 2026-11-05：名前に " や < があると、属性の外に出てしまう）
+const flagIn = (f, on, label) => `<label class="m-flag ${on ? 'on' : ''}"><input type="checkbox" data-f="${esc(f)}" ${on ? 'checked' : ''}><span>${esc(label)}</span></label>`;
 
 function noticeHtml() {
   const n = draft.notice || {};
@@ -1027,9 +1028,10 @@ $('#saveBtn').onclick = async () => {
   if (draft.menu?.added?.some(a => a.price == null)) { tab = 'items'; render(); return alert('値段が入っていない、足した商品があります。値段を入れてください（無料なら 0）。'); }
   if (draft.menu?.dineAdded?.some(a => a.p == null)) { tab = 'dine'; render(); return alert('値段が入っていない、足した店内の品があります。値段を入れてください（無料なら 0）。'); }
   busy = true; drawBar();
+  const sent = clone(draft);   // 送った中身。返事を待つあいだに直した分は、保存したことにしない（Codex の指摘 2026-11-05）
   try {
-    const r = await post({ action: 'saveAppContent', pin, content: draft, expect: server.v });
-    server = { content: clone(draft), v: r.v, at: r.at };
+    const r = await post({ action: 'saveAppContent', pin, content: sent, expect: server.v });
+    server = { content: sent, v: r.v, at: r.at };
     toast('保存しました。公式アプリには数分のうちに出ます');
   } catch (err) {
     if (err.code === 'conflict') {
