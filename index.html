@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">   <!-- maximum-scale：iPhone で、小さい字の欄（画面で直す の直す欄）を押したときに、画面が大きくならないように -->
 <script>
   /* バグる Owner の中から開いたとき（?from=owner）だけ、viewport-fit=cover を外す（2026-11-01。予約ボードと同じ）。
      iPhone のホーム画面のアプリで別のページへ移ると、cover のままでは、使える高さが時計の帯のぶん短いのに上の端が時計の下にもぐり、
@@ -25,11 +25,11 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" href="img/manage-icon-192.png">
 <link rel="apple-touch-icon" href="img/manage-icon-180.png">
-<!-- 字の形は公式アプリ・ホームページと同じ。読めないときは、スマホの字で出る -->
+<!-- 字の形は公式アプリ・ホームページと同じ（太さも同じものを読む。画面で直す の直す欄で、改行の場所をアプリとそろえるため）。読めないときは、スマホの字で出る -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="css/manage.css?v=af14f7d2">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap">
+<link rel="stylesheet" href="css/manage.css?v=889d59b4">
 </head>
 <body>
 <header class="m-top">
@@ -46,8 +46,8 @@
 
 <!-- 公式アプリの「もと」（data.js）と、直した分を重ねるしくみ（content.js）。公開するときは、公式アプリの公開先のものを読む（道具/公開する.py） -->
 <script src="https://t3dining.github.io/baguru-app/js/data.js?v=c54ffd1b"></script>
-<script src="https://t3dining.github.io/baguru-app/js/content.js?v=7ca2de3d"></script>
-<script src="js/texts.js?v=d850c633"></script>   <!-- 公式アプリの文章の一覧（道具/文章を集める.py が作る） -->
-<script src="js/manage.js?v=181ead5e"></script>
+<script src="https://t3dining.github.io/baguru-app/js/content.js?v=fe658efa"></script>
+<script src="js/texts.js?v=684e9675"></script>   <!-- 公式アプリの文章の一覧（道具/文章を集める.py が作る） -->
+<script src="js/manage.js?v=58868ea6"></script>
 </body>
 </html>

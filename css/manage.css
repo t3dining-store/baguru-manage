@@ -148,6 +148,13 @@ body.is-seeing { overflow: hidden; }
 .m-ed-cand { display: block; width: 100%; margin-top: 8px; padding: 10px 12px; border-radius: 10px; border: 1.5px solid var(--line); background: #fff; text-align: left; }
 .m-ed-cand b { display: block; font-size: 14px; line-height: 1.45; }
 .m-ed-cand small { display: block; margin-top: 2px; font-size: 11.5px; color: var(--sub); }
+/* 枠ごとの直す欄。幅と字の形は、中のアプリの枠と同じにする（manage.js の edMirror）。幅は字の並ぶ所だけ（content-box）で、余白と線は外に付ける */
+.m-ed-wrap { overflow-x: auto; margin-top: 4px; padding: 2px 0 4px; }
+.m-ed-mirror { box-sizing: content-box; min-height: 1.4em; padding: 8px 10px; border: 1.5px dashed var(--ember); border-radius: 8px; background: #fff; white-space: pre-wrap; outline: none; line-height: 1.6; font-size: 15px; }
+.m-ed-mirror:focus { border-style: solid; box-shadow: 0 0 0 3px var(--ember-soft); }
+/* 変わる字（数字など）。幅が変わらないよう、余白も線も付けない */
+.m-chip { background: #f6dcd3; border-radius: 3px; color: var(--ember); }
+.m-frame-to { margin: 4px 0 0; white-space: pre-wrap; font-size: 14px; line-height: 1.5; }
 .m-ed-undo { flex: none; height: 30px; padding: 0 11px; border-radius: 999px; border: 1.5px solid var(--line); background: #fff; font-size: 12px; font-weight: 700; color: var(--ember); white-space: nowrap; }
 
 /* 客層 */
