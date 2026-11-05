@@ -539,7 +539,7 @@ function textsHtml() {
     return `<section class="m-sec">
       <h2>アプリの文章</h2>
       ${sw}
-      <p class="m-hint">点線の枠を押すと、その枠の文をまるごと、アプリの下の欄で直せます（欄の幅と字の形はアプリと同じなので、改行の場所も同じになります）。保存するまで、お客様には見えません。押して開く所（商品を選ぶ画面など）は「アプリを動かす」で開いてから、「文を押して直す」に戻して押します。</p>
+      <p class="m-hint">点線の枠を押すと、その枠の文をまるごと、アプリの下の欄で直せます（欄の幅と字の形はアプリと同じです。アプリは、スマホの幅に合わせて、ことばのまとまりごとに自動で改行します）。保存するまで、お客様には見えません。押して開く所（商品を選ぶ画面など）は「アプリを動かす」で開いてから、「文を押して直す」に戻して押します。</p>
     </section>`;
   }
   return `<section class="m-sec">
@@ -669,7 +669,7 @@ function edPanelHtml() {
   return `<div class="m-text ${!c.news && draft.texts?.[c.key] ? 'is-edited' : ''}">
       <div id="edHead">${edHeadHtml()}</div>
       <div class="m-ed-wrap"><div id="edMirror" class="m-ed-mirror ${c.st ? 'is-same' : ''}" role="textbox" aria-multiline="true" aria-label="直した文">${body}</div></div>
-      <p class="m-hint">${c.st ? 'この欄は、アプリの枠と同じ幅・同じ字の大きさです。改行の場所も、アプリと同じになります。' : ''}打ったそばから、上の画面の字が変わります。${c.news && c.f === 'title' ? 'タイトルは1行で出ます（長いと字が小さくなります）。' : '改行すると、アプリでも改行されます。'}${c.news ? '' : '全部消すと元の文に戻ります。'}${c.x === 1 ? '<br>色の付いた字（数字など）は、お店の設定やお客様ごとに変わる字です。打ち直せません（消すことはできます）。' : c.x === 2 ? '<br>色の付いた字は、アプリで太字などになっている字です。ここでは打ち直せず、消すこともできません（その字だけを直すときは、上の画面でその字を押して「その字だけ」を選びます）。' : ''}</p>
+      <p class="m-hint">${c.st ? 'この欄は、アプリの枠と同じ幅・同じ字の大きさです。アプリは、ことばのまとまり（文節）ごとに改行します。改行の場所は、上のアプリの画面で確かめてください。' : ''}打ったそばから、上の画面の字が変わります。${c.news && c.f === 'title' ? 'タイトルは1行で出ます（長いと字が小さくなります）。' : '改行すると、アプリでも改行されます。'}${c.news ? '' : '全部消すと元の文に戻ります。'}${c.x === 1 ? '<br>色の付いた字（数字など）は、お店の設定やお客様ごとに変わる字です。打ち直せません（消すことはできます）。' : c.x === 2 ? '<br>色の付いた字は、アプリで太字などになっている字です。ここでは打ち直せず、消すこともできません（その字だけを直すときは、上の画面でその字を押して「その字だけ」を選びます）。' : ''}</p>
     </div>`;
 }
 /** 直す欄を、アプリの枠と同じ幅・同じ字の形にする（値は CSSOM で入れるので、変な値は入らない） */
@@ -693,10 +693,13 @@ function edMirror() {
   } else if (w >= 10 && w <= 2000) el.style.width = (w + 0.02) + 'px';   // 0.02：小数の誤差で1字だけ折り返さないように
   if (ind > 0 && ind < w) el.style.textIndent = ind + 'px';
   for (const [k, v] of Object.entries({ fontFamily: st.fontFamily, fontSize: st.fontSize, fontWeight: st.fontWeight, fontStyle: st.fontStyle, letterSpacing: st.letterSpacing,
-    lineHeight: st.lineHeight, wordBreak: st.wordBreak, overflowWrap: st.overflowWrap, lineBreak: st.lineBreak, fontFeatureSettings: st.fontFeatureSettings,
+    lineHeight: st.lineHeight, wordBreak: edWordBreak(st.wordBreak), overflowWrap: st.overflowWrap, lineBreak: st.lineBreak, fontFeatureSettings: st.fontFeatureSettings,
     textTransform: st.textTransform, textAlign: st.align, color: st.color })) if (typeof v === 'string' && v.length < 300) el.style[k] = v;
   if (/^(nowrap|pre)$/.test(st.whiteSpace)) el.style.whiteSpace = 'pre';
 }
+/** 直す欄の改行の決まり。公式アプリは文節で改行する（2026-11-05。js/content.js の phrased が見えない区切りを入れ、word-break: keep-all）。
+ *  直す欄には区切りを入れられないので、Chrome の文節で改行（auto-phrase）にする（使えないブラウザは、ふつうの改行） */
+const edWordBreak = wb => (wb === 'keep-all' ? (CSS.supports?.('word-break', 'auto-phrase') ? 'auto-phrase' : 'normal') : wb);
 /** 直す欄の字を、保存する形にする（{1} などはそのまま。改行は \n） */
 function edSerial(el) {
   let out = '';
