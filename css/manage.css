@@ -124,7 +124,7 @@ body.is-seeing { overflow: hidden; }
 .m-see-frame iframe { width: 100%; max-width: 430px; height: 100%; border: 0; background: #fff; }   /* パソコンでも、スマホと同じ幅で改行を見られるように */
 .m-link { color: var(--sub); font-size: 12.5px; font-weight: 700; text-decoration: underline; margin-bottom: 8px; }
 
-/* 文章の「画面で直す」（manage.js の editShow）。中のアプリはスマホの幅（390）のまま、枠に合わせて縮める */
+/* 文章の「画面で直す」（manage.js の editShow）。中のアプリはスマホの幅（430。大きい iPhone。manage.js の ED_W）のまま、枠に合わせて縮める */
 .m-switch { display: flex; gap: 6px; margin: 6px 0 2px; }
 .m-switch button { flex: 1; height: 38px; border-radius: 999px; border: 1.5px solid var(--line); background: #fff; font-size: 13.5px; font-weight: 700; color: var(--sub); }
 .m-switch button.on { background: var(--coal); border-color: var(--coal); color: #fff; }

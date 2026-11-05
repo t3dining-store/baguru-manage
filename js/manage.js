@@ -559,7 +559,9 @@ function textsHtml() {
  *  中のアプリは、描き直しのたびに読み直さないよう、#view の外（#edit）に1回だけ作る。やりとりは同じ場所のページとだけ（postMessage） */
 let textMode = 'screen';
 let ed = null;      // { frame, route, on（文を押して直す）, cur（直している文。edCand の形。無ければ null）, cands（押した所の文。押す前は null）, base }
-const ED_W = 390;   // 中のアプリの幅（スマホと同じ幅にして、改行の位置をそろえる）
+// 中のアプリの幅（スマホと同じ幅にして、改行の位置をそろえる）。★2026-11-05 に 390 → 430（ko-dai さんの指示「アプリとマネージで改行の部分が異なっている」「余白ギリギリまで文字を入れれるように」。
+//   ko-dai さんの iPhone は幅430の大きい iPhone で、390 だと1行に入る字が2字少なく、iPhone では入る字が次の行に回っていた。「アプリで見る」の枠（manage.css の .m-see-frame。最大430）とも同じ幅）
+const ED_W = 430;
 const editUrl = route => seeUrl(route).replace('preview#', 'preview&edit#');
 const edPost = msg => ed?.frame?.contentWindow?.postMessage({ type: 'baguru-manage', ...msg }, APP_ORIGIN);   // 公式アプリの場所だけに送る
 const notTexts = () => canon({ ...draft, texts: undefined });
