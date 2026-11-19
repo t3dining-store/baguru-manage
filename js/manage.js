@@ -229,6 +229,30 @@ const priceIn = (f, v, base, label = '') => `<label class="m-price">${label ? `<
 // data-f には、足した店内の品の名前が入ることがあるので esc する（Codex の指摘 2026-11-05：名前に " や < があると、属性の外に出てしまう）
 const flagIn = (f, on, label) => `<label class="m-flag ${on ? 'on' : ''}"><input type="checkbox" data-f="${esc(f)}" ${on ? 'checked' : ''}><span>${esc(label)}</span></label>`;
 
+/* ---- 受け取りできる日（期間限定の商品。2026-11-19 ko-dai さんの指示「期間限定商品は受取日を限定できるように」「マネージでも直せるように」） ----
+ *  中身の items[商品id].days に ['YYYY-MM-DD'…] で入れる（公式アプリの content.js）。data.js の days と同じなら入れない。
+ *  data.js に日があるのに全部消したときは、空の並び（[]＝いつでも受け取れる）を入れる。
+ *  出すのは、期間限定のカテゴリーの商品と、日が決まっている商品だけ */
+const dayBase = id => { const i = ITEM_BY_ID[id], k = i ? ITEM_BASE.get(i) : undefined; return k === undefined ? null : CONTENT_BASE.items[k].days || null; };
+const dayNow = id => { const o = ov('items', id); return Array.isArray(o.days) ? o.days : dayBase(id) || []; };
+const dayText = k => { const [y, m, d] = k.split('-').map(Number); return `${m}/${d}（${'日月火水木金土'[new Date(y, m - 1, d).getDay()]}）`; };
+function setDays(id, list) {
+  const v = [...new Set(list)].filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort(), base = dayBase(id) || [];
+  setOv('items', id, 'days', sameList(v, base) ? undefined : v);
+}
+function daysIn(id, cat) {
+  const o = ov('items', id), now = dayNow(id), base = dayBase(id);
+  if (cat !== 'limited' && !base && !Array.isArray(o.days)) return '';
+  return `<div class="m-days">
+      <span class="m-days-ttl">受け取りできる日</span>
+      <div class="m-days-list">${now.length ? now.map(k => `<span class="m-day ${k < todayKey() ? 'is-past' : ''}">${esc(dayText(k))}<button data-act="day-del" data-key="${esc(id)}" data-day="${esc(k)}" aria-label="${esc(dayText(k))}を消す">×</button></span>`).join('')
+        : '<span class="m-days-none">決めていません（いつでも受け取れます）</span>'}</div>
+      <label class="m-day-add"><span>＋ 日を足す</span><input type="date" data-day-add="${esc(id)}" min="${todayKey()}"></label>
+      ${Array.isArray(o.days) ? `<button class="m-link" data-act="day-reset" data-key="${esc(id)}">もとの日（${base ? esc(base.map(dayText).join('・')) : '決めていない'}）に戻す</button>` : ''}
+      <p class="m-hint">この日だけ受け取れます（「今から受け取る」は、今日がこの日のときだけ）。全部の日が過ぎると、公式アプリのメニューに出なくなります。日を全部消すと、いつでも受け取れます。</p>
+    </div>`;
+}
+
 function noticeHtml() {
   const n = draft.notice || {};
   return `<section class="m-sec">
@@ -309,6 +333,7 @@ function itemsHtml() {
               <label class="m-field m-wide"><span>選ぶもの（ソース・ご飯の量など）</span><select data-f="add:like:${esc(a.id)}">${LIKE_OPTS().map(([v, t]) => `<option value="${esc(v)}" ${(a.like || '') === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
               <div class="m-prices">${addPriceIn(`add:price:${a.id}`, a.price, acaiLike ? 'ミニ' : '')}${acaiLike ? addPriceIn(`add:regular:${a.id}`, a.regular, 'レギュラー') : ''}</div>
               <div class="m-flags">${flagIn(`item:soldOut:${a.id}`, o.soldOut, '売り切れ')}${flagIn(`item:hidden:${a.id}`, o.hidden, '出さない')}</div>
+              ${daysIn(a.id, a.cat)}
             </div>`;
         }
         const i = ITEM_BY_ID[x.id], b = CONTENT_BASE.items[ITEMS.indexOf(i)];
@@ -318,6 +343,7 @@ function itemsHtml() {
               ? priceIn(`item:price:${i.id}`, o.price, b.price, 'ミニ') + priceIn(`item:regular:${i.id}`, o.regular, b.regular, 'レギュラー')
               : priceIn(`item:price:${i.id}`, o.price, b.price)}</div>
             <div class="m-flags">${flagIn(`item:soldOut:${i.id}`, o.soldOut, '売り切れ')}${flagIn(`item:hidden:${i.id}`, o.hidden, '出さない')}</div>
+            ${daysIn(i.id, i.cat)}
           </div>`;
       }).join('')}
       <button class="m-btn m-sub" data-act="item-add" data-cat="${esc(cat.id)}">＋ ${esc(cat.name)}に商品を足す</button>
@@ -951,6 +977,11 @@ document.addEventListener('input', e => {
 document.addEventListener('change', e => {
   if (e.target.id === 'textOnly') { textOnly = e.target.checked; return render(); }
   if (e.target.dataset.photo) return choosePhoto(e.target);   // 写真のタブ：写真を選んだ
+  if (e.target.dataset.dayAdd && server) {   // 受け取りできる日を足す（上の daysIn）
+    const id = e.target.dataset.dayAdd, k = e.target.value;
+    if (k) setDays(id, [...dayNow(id), k]);
+    return render();
+  }
   if (!e.target.dataset.f || !server) return;
   take(e.target);
   if (e.target.dataset.f.startsWith('text:')) {   // 文章のタブは、書いている場所が動かないように描き直さない
@@ -979,6 +1010,8 @@ document.addEventListener('click', e => {
   if (b.dataset.act === 'text-mode') { textMode = b.dataset.mode; return render(); }
   if (b.dataset.act?.startsWith('ed-')) return edAct(b);
   if (b.dataset.act === 'photo-reset') { setOv('photos', b.dataset.slot, 'id', undefined); delete photoErr[b.dataset.slot]; return render(); }   // 写真をもとに戻す（ドライブの写真は消さない）
+  if (b.dataset.act === 'day-del') { setDays(b.dataset.key, dayNow(b.dataset.key).filter(k => k !== b.dataset.day)); return render(); }   // 受け取りできる日を消す
+  if (b.dataset.act === 'day-reset') { setOv('items', b.dataset.key, 'days', undefined); return render(); }   // data.js の日に戻す
   if (menuAct(b)) return render();
   if (b.dataset.act === 'frame-reset' && draft.texts) {   // 一覧の「枠ごと」の文を元に戻す
     delete draft.texts[b.dataset.k];

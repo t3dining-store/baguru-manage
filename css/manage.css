@@ -163,6 +163,18 @@ body.is-seeing { overflow: hidden; }
 .m-order-row .m-back { width: auto; height: 36px; margin: 0; padding: 0 16px; }
 .m-added { padding: 10px; margin: 6px 0; border: 1.5px dashed var(--ember); border-radius: 12px; background: #fffaf7; }
 .m-new { font-size: 12px; font-weight: 700; color: var(--ember); }
+/* 受け取りできる日（期間限定の商品。manage.js の daysIn。2026-11-19） */
+.m-days { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 8px 10px; border-radius: 10px; background: #fbe9e4; }
+.m-days-ttl { flex-basis: 100%; font-size: 12.5px; font-weight: 700; color: var(--ember); }
+.m-days-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.m-day { display: inline-flex; align-items: center; gap: 2px; height: 32px; padding: 0 4px 0 12px; border-radius: 999px; background: #fff; border: 1.5px solid var(--ember); font-size: 13px; font-weight: 700; }
+.m-day button { width: 26px; height: 26px; border: 0; border-radius: 50%; background: none; font-size: 15px; color: var(--sub); cursor: pointer; }
+.m-day.is-past { opacity: .5; text-decoration: line-through; }
+.m-days-none { font-size: 12.5px; color: var(--sub); }
+.m-day-add { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+.m-day-add input { width: auto; }
+.m-days .m-hint { flex-basis: 100%; margin: 2px 0 0; }
+.m-days .m-link { border: 0; background: none; padding: 0; font-size: 12.5px; color: var(--ember); text-decoration: underline; cursor: pointer; }
 .m-field.m-wide { grid-column: 1 / -1; margin: 0; }
 .m-field.m-wide select { width: 100%; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; font: inherit; }
 /* 写真のタブ */
