@@ -410,7 +410,7 @@ function dineHtml() {
           ? it.sizes.map((sz, k) => priceIn(`dine:size:${key}:${k}`, Array.isArray(o.sizes) ? o.sizes[k] ?? null : null, base.sizes[k], sz[0])).join('')
           : priceIn(`dine:p:${key}`, o.p, base.p);
         return `<div class="m-row ${o.hidden ? 'is-hidden' : ''}">
-            <div class="m-name m-name-row"><b>${esc(it.n)}</b>${mv}</div>
+            <div class="m-name m-name-row"><b>${esc(it.n)}${it.testOnly ? ' <span class="m-new">テスト用アカウントだけ（まだお客さまに出していません）</span>' : ''}${it.daysOf ? ' <span class="m-new">売る日は、テイクアウトの「受け取りできる日」と同じ</span>' : ''}</b>${mv}</div>
             <div class="m-prices">${prices}</div>
             <div class="m-flags">${flagIn(`dine:hidden:${key}`, o.hidden, '出さない')}</div>
           </div>`;
