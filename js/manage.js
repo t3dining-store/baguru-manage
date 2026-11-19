@@ -313,7 +313,7 @@ function itemsHtml() {
         }
         const i = ITEM_BY_ID[x.id], b = CONTENT_BASE.items[ITEMS.indexOf(i)];
         return `<div class="m-row ${o.hidden ? 'is-hidden' : ''} ${o.soldOut ? 'is-out' : ''}">
-            <div class="m-name m-name-row"><b>${esc(i.full || i.name)}</b>${mv}</div>
+            <div class="m-name m-name-row"><b>${esc(i.full || i.name)}${i.testOnly ? ' <span class="m-new">テスト用アカウントだけ（まだお客さまに出していません）</span>' : ''}</b>${mv}</div>
             <div class="m-prices">${b.regular != null
               ? priceIn(`item:price:${i.id}`, o.price, b.price, 'ミニ') + priceIn(`item:regular:${i.id}`, o.regular, b.regular, 'レギュラー')
               : priceIn(`item:price:${i.id}`, o.price, b.price)}</div>
